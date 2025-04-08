@@ -1,30 +1,75 @@
-/vendor/
-node_modules/
-npm-debug.log
-yarn-error.log
+# Node modules and logs
+/FischyChess/node_modules/
+/FischyChess/npm-debug.log*
+/FischyChess/yarn-error.log*
 
-# Laravel 4 specific
-bootstrap/compiled.php
-app/storage/
+# Composer dependencies
+/FischyChess/vendor/
 
-# Laravel 5 & Lumen specific
-public/storage
-public/hot
+# Laravel specific
+/FischyChess/bootstrap/compiled.php
+/FischyChess/app/storage/
+/FischyChess/storage/*.key
+/FischyChess/storage/logs/
+/FischyChess/storage/framework/
+/FischyChess/storage/debugbar/
+/FischyChess/public/storage
+/FischyChess/public/hot
+/FischyChess/public/build
+/FischyChess/public_html/storage
+/FischyChess/public_html/hot
 
-# Laravel 5 & Lumen specific with changed public path
-public_html/storage
-public_html/hot
+# Environment and configuration files
+/FischyChess/.env
+/FischyChess/.env.*
+/FischyChess/Homestead.yaml
+/FischyChess/Homestead.json
+/FischyChess/.phpunit.result.cache
+/FischyChess/.phpactor.json
+/FischyChess/auth.json
 
-storage/*.key
-.env
-Homestead.yaml
-Homestead.json
-/.vagrant
-.phpunit.result.cache
+# IDE and editor specific
+/FischyChess/.idea/
+/FischyChess/.vscode/
+/FischyChess/*.sublime-workspace
+/FischyChess/*.sublime-project
 
-/public/build
-/storage/pail
-.env.backup
-.env.production
-.phpactor.json
-auth.json
+# System files
+/FischyChess/.DS_Store
+/FischyChess/.AppleDouble
+/FischyChess/.LSOverride
+/FischyChess/Thumbs.db
+/FischyChess/ehthumbs.db
+/FischyChess/Desktop.ini
+
+# Backup files
+/FischyChess/*~
+/FischyChess/*.swp
+/FischyChess/*.bak
+/FischyChess/*.tmp
+
+# Logs and debugging files
+/FischyChess/storage/logs/*.log
+/FischyChess/storage/framework/cache/*
+/FischyChess/storage/framework/sessions/*
+/FischyChess/storage/framework/views/*
+/FischyChess/storage/debugbar/*
+/FischyChess/php_errors.log
+
+# Deployment files
+/FischyChess/.env.backup
+/FischyChess/.env.production
+/FischyChess/.env.testing
+/FischyChess/.env.staging
+
+# Miscellaneous
+/FischyChess/.vagrant
+/FischyChess/.coverage
+/FischyChess/.sass-cache/
+/FischyChess/.cache/
+/FischyChess/.next/
+/FischyChess/.nuxt/
+/FischyChess/dist/
+/FischyChess/build/
+/FischyChess/.terraform/
+/FischyChess/.serverless/
