@@ -73,3 +73,10 @@
 /FischyChess/build/
 /FischyChess/.terraform/
 /FischyChess/.serverless/
+
+/FischyChess/.phpunit.cache
+/FischyChess/bootstrap/ssr
+/FischyChess/storage/pail
+/FischyChess/.fleet
+/FischyChess/.nova
+/FischyChess/.zed
