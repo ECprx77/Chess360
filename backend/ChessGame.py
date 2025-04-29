@@ -89,27 +89,20 @@ class ChessGame:
         except Exception as e:
             return {"error": str(e)}
 
-    def get_best_move(self, depth: int = 15) -> Dict[str, any]:
-        """Get the best move with evaluation"""
-        try:
-            with self._create_engine() as engine:
-                result = engine.play(
-                    self.board,
-                    chess.engine.Limit(depth=depth)
-                )
-                return {
-                    "move": result.move.uci() if result.move else None,
-                    "depth": depth
-                }
-        except Exception as e:
-            return {"error": str(e)}
-
-    def undo_move(self) -> Dict:
-        """Undo the last move"""
-        if self.move_history:
-            self.board.pop()
-            self.move_history.pop()
-        return self._get_game_state()
+    # def get_best_move(self, depth: int = 15) -> Dict[str, any]:
+    #     """Get the best move with evaluation"""
+    #     try:
+    #         with self._create_engine() as engine:
+    #             result = engine.play(
+    #                 self.board,
+    #                 chess.engine.Limit(depth=depth)
+    #             )
+    #             return {
+    #                 "move": result.move.uci() if result.move else None,
+    #                 "depth": depth
+    #             }
+    #     except Exception as e:
+    #         return {"error": str(e)}
 
     def reset_game(self) -> Dict:
         """Reset the game to initial position"""
