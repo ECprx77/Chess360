@@ -1,99 +1,192 @@
 <template>
-  <div class="login-container">
-    <div class="logo">
-      <h1>Chess360</h1>
-      <img src="/chess-logo.png" alt="Chess Logo" class="chess-icon">
+  <div class="login-page">
+    <div class="background-blur" />
+
+
+    <img class="side-img left" src="../../../img/Chess360.png" />
+    <img class="side-img right" src="../../../img/Chess360.png" />
+
+    <div class="header">
+      <div class="title">Chess360</div>
+      <img class="logo" src="../../../img/Chess360.png" />
     </div>
-    <div class="login-form">
-      <input type="email" placeholder="Email..." v-model="email">
-      <input type="password" placeholder="Password..." v-model="password">
-      
-      <div class="buttons">
-        <button @click="login" class="btn">Login</button>
-        <button @click="register" class="btn">Register</button>
-      </div>
+
+    <div class="login-container">
+      <img class="icon" src="../../../img/home.png" />
+      <form class="form-box" @submit.prevent="handleLogin">
+        <input v-model="email" type="email" placeholder="Email" class="input-box" required />
+        <input v-model="password" type="password" placeholder="Password" class="input-box" required />
+        <div class="buttons">
+          <button type="submit" class="button login">Login</button>
+          <button type="button" @click="handleRegister" class="button register">Register</button>
+        </div>
+      </form>
     </div>
+
+    <div class="footer-blur" />
   </div>
 </template>
+
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 
-const router = useRouter()
 const email = ref('')
 const password = ref('')
 
-const login = () => {
-  // Add login logic here
-  router.push('/game')
+function handleLogin() {
+  console.log('Logging in with:', email.value, password.value)
+  // auth logic next
 }
 
-const register = () => {
-  // Add registration logic here
+function handleRegister() {
+  console.log('Redirect to registration')
+  //register post and check next
 }
 </script>
 
 <style scoped>
-.login-container {
+.login-page {
+  position: relative;
+  width: 100vw;
   height: 100vh;
+  background: #524D46;
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+.background-blur {
+  position: absolute;
+  width: 100%;
+  height: 1000px;
+  top: 0;
+  left: 0;
+  background: rgba(126, 126, 126, 0.2);
+  backdrop-filter: blur(7.5px);
+  z-index: 0;
+}
+
+.footer-blur {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+
+  height: 70px;
+  background: #9875CD;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  box-shadow: 4px 4px 4px rgba(0, 0, 0, 0.25);
+  filter: blur(2px);
+}
+
+.side-img {
+  position: absolute;
+  width: 343px;
+  height: 343px;
+  top: 318px;
+  filter: blur(2px);
+  z-index: 1;
+}
+.left {
+  left: -172px;
+}
+.right {
+  right: -172px;
+}
+
+.header {
+  position: absolute;
+  top: 17.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 406.25px;
+  height: 125px;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  color: white;
+  z-index: 2;
 }
-
-.logo {
+.title {
+  font-size: 50px;
+  color: #9875CD;
+  width: 281.25px;
   text-align: center;
-  margin-bottom: 2rem;
+}
+.logo {
+  width: 200px;
+  height: 200px;
 }
 
-.logo h1 {
-  color: var(--primary-color);
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
+.login-container {
+  position: absolute;
+  top: 300px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 406.25px;
+  height: 300px; 
+  background: #7C43D3;
+  border-top-right-radius: 25px; 
+  border-bottom-right-radius: 25px;
+  border-bottom-left-radius: 25px;
+  z-index: 2;
+  padding-top: 50px; 
 }
 
-.chess-icon {
-  width: 60px;
-  height: 60px;
+.icon {
+  position: absolute;
+  top: -70px;
+  left: 0%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 100px;
+  z-index: 1;
 }
 
-.login-form {
-  background-color: var(--primary-color);
-  padding: 2rem;
-  border-radius: 15px;
+.form-box {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  width: 300px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 0 25px; 
 }
-
-input {
-  padding: 0.8rem;
+.input-box {
+  width: 100%;
+  height: 56.25px;
+  padding: 0 15px; 
+  font-size: 18.75px; 
+  justify-content: space-between;
   border: none;
-  border-radius: 5px;
-  background-color: white;
+  background: #D9D9D9;
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  border-bottom-left-radius: 28px;
+  color: #524D46;
+}
+.input-box:focus {
+  outline: none;
 }
 
 .buttons {
   display: flex;
-  gap: 1rem;
-  justify-content: space-between;
+  justify-content: space-around;
+  width: 100%;
+  margin-top: 12.5px; /* 20 / 1.6 */
 }
-
-.btn {
-  padding: 0.8rem 1.5rem;
-  border: none;
-  border-radius: 5px;
-  background-color: white;
-  color: var(--primary-color);
+.button {
+  width: 118.75px; /* 190 / 1.6 */
+  height: 43.125px; /* 69 / 1.6 */
+  background: #D9D9D9;
+  border-radius: 12.5px; /* 20 / 1.6 */
+  color: #9875CD;
+  font-size: 18.75px; /* 30 / 1.6 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-weight: bold;
-  transition: opacity 0.2s;
+  border: none;
+  transition: background 0.3s ease;
 }
-
-.btn:hover {
-  opacity: 0.9;
+.button:hover {
+  background: #c0b4e0;
 }
 </style>
