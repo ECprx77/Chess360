@@ -1,47 +1,133 @@
 <template>
   <div class="login-page">
-    <div class="background-blur" />
+    <div class="background-blur"/>
 
 
-    <img class="side-img left" src="../../../img/Chess360.png" />
-    <img class="side-img right" src="../../../img/Chess360.png" />
+    <img class="side-img left" src="../../../img/Chess360.png"/>
+    <img class="side-img right" src="../../../img/Chess360.png"/>
 
     <div class="header">
       <div class="title">Chess360</div>
-      <img class="logo" src="../../../img/Chess360.png" />
+      <img class="logo" src="../../../img/Chess360.png"/>
     </div>
 
     <div class="login-container">
-      <img class="icon" src="../../../img/home.png" />
+      <img class="icon" src="../../../img/home.png"/>
       <form class="form-box" @submit.prevent="handleLogin">
-        <input v-model="email" type="email" placeholder="Email" class="input-box" required />
-        <input v-model="password" type="password" placeholder="Password" class="input-box" required />
+        <input v-model="email" type="email" placeholder="Email" class="input-box" required/>
+        <input v-model="password" type="password" placeholder="Password" class="input-box" required/>
         <div class="buttons">
           <button type="submit" class="button login">Login</button>
           <button type="button" @click="handleRegister" class="button register">Register</button>
-        </div>
+        </div> 
       </form>
     </div>
 
-    <div class="footer-blur" />
+    <div class="footer-blur"/>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const email = ref('')
 const password = ref('')
 
-function handleLogin() {
-  console.log('Logging in with:', email.value, password.value)
-  // auth logic next
+async function handleLogin() {
+  try {
+    console.log('Login attempted');
+    console.log('Current route:', router.currentRoute.value.path);
+    const result = await router.push('/game');
+    console.log('Navigation result:', result);
+  } catch (error) {
+    console.error('Navigation failed:', error);
+  }
 }
 
-function handleRegister() {
-  console.log('Redirect to registration')
-  //register post and check next
-}
+// async function handleLogin() {
+//   try {
+//     const response = await fetch('http://localhost/Chess360/backend/api/php/login.php', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({
+//         email: email.value,
+//         password: password.value
+//       })
+//     });
+
+//     const data = await response.json();
+
+//     if (data.status === 'success') {
+//       // Store user data in localStorage or Vuex store
+//       localStorage.setItem('user_id', data.user_id);
+//       router.push('/game'); // Redirect to game page
+//     } else {
+//       alert(data.message);
+//     }
+//   } catch (error) {
+//     console.error('Login error:', error);
+//     alert('Login failed. Please try again.');
+//   }
+// }
+
+// async function handleRegister() {
+//   try {
+//     const response = await fetch('http://localhost/Chess360/backend/api/php/register.php', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({
+//         email: email.value,
+//         password: password.value
+//       })
+//     });
+
+//     const data = await response.json();
+//     let tempmail = email.value;
+//     let tempword = password.value;
+
+//     if (data.status === 'success') {
+//       alert('Registration successful! logging you in...');
+//       try {
+//         const response = await fetch('http://localhost/Chess360/backend/api/php/login.php', {
+//           method: 'POST',
+//           headers: {
+//             'Content-Type': 'application/json',
+//           },
+//           body: JSON.stringify({
+//             email: tempmail,
+//             password: tempword
+//           })
+//         });
+
+//         const data = await response.json();
+
+//         if (data.status === 'success') {
+//           email.value = '';
+//           password.value = '';
+//           localStorage.setItem('user_id', data.user_id);
+//           router.push('/game');
+//         } else {
+//           alert(data.message);
+//         }
+//       } catch (error) {
+//         console.error('Login error:', error);
+//         alert('Login failed. Please try again.');
+//       }
+
+//     } else {
+//       alert(data.message);
+//     }
+//   } catch (error) {
+//     console.error('Registration error:', error);
+//     alert('Registration failed. Please try again.');
+//   }
+// }
 </script>
 
 <style scoped>
@@ -152,7 +238,8 @@ function handleRegister() {
 .input-box {
   width: 100%;
   height: 56.25px;
-  padding: 0 15px; 
+  padding: 0 15px;
+  margin-bottom: 25px;
   font-size: 18.75px; 
   justify-content: space-between;
   border: none;

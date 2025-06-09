@@ -4,13 +4,30 @@ import App from './App.vue'
 import GameView from './views/GameView.vue'
 import LoginView from './views/LoginView.vue'
 
+const routes = [
+  { 
+    path: '/', 
+    name: 'Login',
+    component: LoginView 
+  },
+  { 
+    path: '/game', 
+    name: 'Game',
+    component: GameView,
+    meta: { requiresAuth: true }
+  }
+]
+
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    { path: '/', component: LoginView },
-    { path: '/game', component: GameView }
-  ]
+  routes
 })
+
+
+router.beforeEach((to, from, next) => {
+  console.log('Navigating from:', from.path, 'to:', to.path);
+  next();
+});
 
 const app = createApp(App)
 app.use(router)
