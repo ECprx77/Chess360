@@ -1,13 +1,22 @@
 import chess
 import chess.engine
 from typing import List, Optional, Dict
+import random
 
 class ChessGame:
-    def __init__(self):
-        self.board = chess.Board()
+    def __init__(self, variant="standard"):
+        self.variant = variant
+        if variant == "chess960":
+            self.board = self._create_chess960_board()
+        else:
+            self.board = chess.Board()
         self.move_history: List[str] = []
         self.game_status: str = "active"
         
+    def _create_chess960_board(self) -> chess.Board:
+        """Creates a Chess960 starting position"""
+        return chess.Board.from_chess960_pos(random.randint(0, 959))
+    
     def make_move(self, move_uci: str) -> Dict:
         """
         Make a move using Universal Chess Interface notation
@@ -38,7 +47,8 @@ class ChessGame:
             "is_stalemate": self.board.is_stalemate(),
             "is_insufficient_material": self.board.is_insufficient_material(),
             "is_game_over": self.board.is_game_over(),
-            "turn": "white" if self.board.turn else "black"
+            "turn": "white" if self.board.turn else "black",
+            "variant": self.variant
         }
         
         if self.board.is_game_over():
@@ -106,6 +116,9 @@ class ChessGame:
 
     def reset_game(self) -> Dict:
         """Reset the game to initial position"""
-        self.board = chess.Board()
+        if self.variant == "chess960":
+            self.board = self._create_chess960_board()
+        else:
+            self.board = chess.Board()
         self.move_history = []
         return self._get_game_state()

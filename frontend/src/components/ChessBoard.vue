@@ -14,12 +14,24 @@
           <div 
             v-for="col in 8" 
             :key="col" 
-            :class="['board-cell', getCellColor(row, col)]"
-            @click="handleCellClick(row-1, col-1)"
+            :class="[
+              'board-cell', 
+              getCellColor(row, col),
+              { 'legal-move': isLegalMove(row-1, col-1) }
+            ]"
+            @dragover.prevent
+            @drop="handleDrop($event, row-1, col-1)"
           >
-            <div v-if="board[row-1][col-1]" class="chess-piece">
-              {{ getPieceSymbol(board[row-1][col-1]) }}
-            </div>
+            <img 
+              v-if="board[row-1] && board[row-1][col-1]"
+              :src="getPieceImage(board[row-1][col-1])"
+              :alt="board[row-1][col-1]"
+              class="chess-piece"
+              draggable="true"
+              @dragstart="handleDragStart($event, row-1, col-1)"
+              @click="handlePieceClick(row-1, col-1)"
+            >
+            <div v-if="isLegalMove(row-1, col-1)" class="move-indicator"></div>
           </div>
         </div>
       </div>
@@ -30,126 +42,209 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 
-// Initialize empty 8x8 board
-const board = ref(Array(8).fill().map(() => Array(8).fill('')));
-const selectedPiece = ref(null);
-const gameState = ref(null);
+// Initialize board with starting position
+const initialPosition = [
+  ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+  ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+  Array(8).fill(''),
+  Array(8).fill(''),
+  Array(8).fill(''),
+  Array(8).fill(''),
+  ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+  ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+];
 
-// Initialize game through API
-const initializeGame = async () => {
+const board = ref(initialPosition);
+const draggedPiece = ref(null);
+const legalMoves = ref([]);
+
+const getPieceImage = (piece) => {
+  if (!piece) return '';
+  const color = piece === piece.toUpperCase() ? 'white' : 'black';
+  const pieceName = piece.toLowerCase();
+  const pieceTypes = {
+    'k': 'king',
+    'q': 'queen',
+    'r': 'rook',
+    'b': 'bishop',
+    'n': 'knight',
+    'p': 'pawn'
+  };
+  return `/pieces/${color}/${pieceTypes[pieceName]}.png`;
+};
+
+const getCellColor = (row, col) => {
+  return (row + col) % 2 === 0 ? 'white-cell' : 'black-cell';
+};
+
+const getLegalMoves = async (row, col) => {
+  const files = 'abcdefgh';
+  const ranks = '87654321';
+  const square = files[col] + ranks[row];
+  
   try {
-    const response = await fetch('http://localhost:8000/chess/game/start', {
-      method: 'POST'
+    const response = await fetch('http://localhost:8000/chess/game/legal-moves', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ square })
     });
-    await response.json();
-    await updateGameState();
-  } catch (error) {
-    console.error('Failed to initialize game:', error);
-  }
-};
-
-// Get current game state from API
-const updateGameState = async () => {
-  try {
-    const response = await fetch('http://localhost:8000/chess/game/board');
     const data = await response.json();
-    updateBoardFromFEN(data.board.fen);
-    gameState.value = data.board;
+    return data.legal_moves;
   } catch (error) {
-    console.error('Failed to get game state:', error);
+    console.error('Failed to get legal moves:', error);
+    return [];
   }
 };
 
-// Make move through API
-const makeMove = async (from, to) => {
+const isLegalMove = (row, col) => {
+  const files = 'abcdefgh';
+  const ranks = '87654321';
+  const targetSquare = files[col] + ranks[row];
+  
+  return legalMoves.value.some(move => move.slice(2) === targetSquare);
+};
+
+const isCastlingMove = (moveUCI) => {
+  const castlingMoves = {
+    'e1g1': { from: 'h1', to: 'f1' }, // White kingside
+    'e1c1': { from: 'a1', to: 'd1' }, // White queenside
+    'e8g8': { from: 'h8', to: 'f8' }, // Black kingside
+    'e8c8': { from: 'a8', to: 'd8' }  // Black queenside
+  };
+  return castlingMoves[moveUCI];
+};
+
+const updateBoardPosition = (fromRow, fromCol, toRow, toCol, piece) => {
+  board.value[fromRow][fromCol] = '';
+  board.value[toRow][toCol] = piece;
+};
+
+const handlePieceClick = async (row, col) => {
+  // Clear previous legal moves if clicking the same piece
+  if (draggedPiece.value?.row === row && draggedPiece.value?.col === col) {
+    draggedPiece.value = null;
+    legalMoves.value = [];
+    return;
+  }
+  
+  // Set new dragged piece and get legal moves
+  draggedPiece.value = {
+    row,
+    col,
+    piece: board.value[row][col]
+  };
+  legalMoves.value = await getLegalMoves(row, col);
+};
+
+const handleDragStart = async (event, row, col) => {
+  draggedPiece.value = {
+    row,
+    col,
+    piece: board.value[row][col]
+  };
+  event.dataTransfer.setData('text/plain', board.value[row][col]);
+  
+  // Get and show legal moves
+  legalMoves.value = await getLegalMoves(row, col);
+};
+
+const handleDrop = async (event, targetRow, targetCol) => {
+  event.preventDefault();
+  
+  if (!draggedPiece.value) return;
+  
+  const { row: fromRow, col: fromCol } = draggedPiece.value;
+  
+  // Convert target position to UCI format
+  const files = 'abcdefgh';
+  const ranks = '87654321';
+  const moveUCI = files[fromCol] + ranks[fromRow] + files[targetCol] + ranks[targetRow];
+  
+  // Check if move is legal using the global legalMoves ref
+  if (!legalMoves.value.includes(moveUCI)) {
+    console.log('Illegal move');
+    draggedPiece.value = null;
+    return;
+  }
+  
   try {
-    const move = `${from}${to}`;  // Convert to UCI format (e.g., "e2e4")
     const response = await fetch('http://localhost:8000/chess/game/move', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ move: move })
+      body: JSON.stringify({ move: moveUCI })
     });
+    
     const data = await response.json();
-    
-    if (data.error) {
-      alert('Invalid move!');
-      return false;
-    }
-    
-    await updateGameState();
-    return true;
-  } catch (error) {
-    console.error('Failed to make move:', error);
-    return false;
-  }
-};
-
-// Get cell color based on position
-const getCellColor = (row, col) => {
-  return (row + col) % 2 === 0 ? 'white-cell' : 'black-cell';
-};
-
-// Convert piece notation to Unicode chess symbols
-const getPieceSymbol = (piece) => {
-  const symbols = {
-    'k': '♔', 'q': '♕', 'r': '♖', 'b': '♗', 'n': '♘', 'p': '♙',
-    'K': '♚', 'Q': '♛', 'R': '♜', 'B': '♝', 'N': '♞', 'P': '♟'
-  };
-  return symbols[piece] || '';
-};
-
-// Handle cell click for piece movement
-const handleCellClick = async (row, col) => {
-  if (!selectedPiece.value) {
-    if (board.value[row][col]) {
-      selectedPiece.value = { row, col };
-    }
-  } else {
-    const fromSquare = convertToAlgebraic(selectedPiece.value.row, selectedPiece.value.col);
-    const toSquare = convertToAlgebraic(row, col);
-    
-    const success = await makeMove(fromSquare, toSquare);
-    if (!success) {
-      selectedPiece.value = null;
-      return;
-    }
-    
-    selectedPiece.value = null;
-  }
-};
-
-// Convert board position to algebraic notation (e.g., e2)
-const convertToAlgebraic = (row, col) => {
-  const files = 'abcdefgh';
-  const ranks = '87654321';
-  return files[col] + ranks[row];
-};
-
-// Update board from FEN string
-const updateBoardFromFEN = (fen) => {
-  const fenBoard = fen.split(' ')[0];
-  const rows = fenBoard.split('/');
-  const newBoard = [];
-  
-  for (const row of rows) {
-    const boardRow = [];
-    for (const char of row) {
-      if (isNaN(char)) {
-        boardRow.push(char);
-      } else {
-        for (let i = 0; i < parseInt(char); i++) {
-          boardRow.push('');
-        }
+    if (!data.error) {
+      // Update king position
+      updateBoardPosition(fromRow, fromCol, targetRow, targetCol, draggedPiece.value.piece);
+      
+      // Check if this is a castling move and update rook position
+      const castling = isCastlingMove(moveUCI);
+      if (castling) {
+        const rookFrom = {
+          row: parseInt(ranks.indexOf(castling.from[1])),
+          col: files.indexOf(castling.from[0])
+        };
+        const rookTo = {
+          row: parseInt(ranks.indexOf(castling.to[1])),
+          col: files.indexOf(castling.to[0])
+        };
+        const rookPiece = board.value[rookFrom.row][rookFrom.col];
+        updateBoardPosition(rookFrom.row, rookFrom.col, rookTo.row, rookTo.col, rookPiece);
       }
     }
-    newBoard.push(boardRow);
+  } catch (error) {
+    console.error('Failed to make move:', error);
   }
   
-  board.value = newBoard;
+  // Clear legal moves after drop
+  legalMoves.value = [];
+  draggedPiece.value = null;
 };
 
+// initialization function
+const initializeGame = async (variant = "chess960") => {
+  try {
+    const response = await fetch('http://localhost:8000/chess/game/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ variant })
+    });
+    const data = await response.json();
+    console.log('Game initialized:', data);
+    
+    // Convert FEN to board array
+    const fenParts = data.fen.split(' ');
+    const position = fenParts[0].split('/').map(row => 
+      row.split('').reduce((acc, char) => {
+        if (isNaN(char)) {
+          acc.push(char);
+        } else {
+          acc.push(...Array(parseInt(char)).fill(''));
+        }
+        return acc;
+      }, [])
+    );
+    
+    // Update board with FEN position
+    board.value = position;
+    
+    // Clear any existing state
+    draggedPiece.value = null;
+    legalMoves.value = [];
+  } catch (error) {
+    console.error('Failed to initialize game:', error);
+  }
+};
+
+// Call initialization on component mount
 onMounted(() => {
   initializeGame();
 });
@@ -245,9 +340,31 @@ onMounted(() => {
   background-color: #9370DB;
 }
 
+.legal-move {
+  position: relative;
+}
+
+.move-indicator {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: rgba(180, 143, 255, 0.7);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .chess-piece {
-  font-size: 2em;
+  position: relative;
+  z-index: 2;
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
   user-select: none;
-  color: #333333;
+  cursor: grab;
+}
+
+.chess-piece:active {
+  cursor: grabbing;
 }
 </style>

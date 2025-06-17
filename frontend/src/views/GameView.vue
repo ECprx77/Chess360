@@ -1,8 +1,44 @@
 <template>
   <div class="game-container">
-    <div class="game-board">
-      <div class="game-view">
-        <ChessBoard :playerColor="'white'" />
+
+    <img class="side-img left" src="../../../img/Chess360.png"/>
+    <img class="side-img right" src="../../../img/Chess360.png"/>
+
+    <div class="game-layout">
+      <!-- Chess Board -->
+      <ChessBoard ref="chessBoardRef"/>
+      <div class="players-container">
+        <!-- Opponent Info Window -->
+        <div class="window-container player-window opponent-window">
+          <div class="window-header">
+            <div class="window-title">Opponent</div>
+          </div>
+          <div class="window-content profile-content">
+            <div class="profile-image">
+              <img src="../../../img/default-avatar.png" alt="Opponent" class="avatar">
+            </div>
+            <div class="profile-info">
+              <h2 class="username">ChessWizard</h2>
+              <div class="elo-rating">ELO: 1820</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Player Info Window -->
+        <div class="window-container player-window">
+          <div class="window-header">
+            <div class="window-title">You</div>
+          </div>
+          <div class="window-content profile-content">
+            <div class="profile-image">
+              <img src="../../../img/default-avatar.png" alt="You" class="avatar">
+            </div>
+            <div class="profile-info">
+              <h2 class="username">GrandMaster_Flash</h2>
+              <div class="elo-rating">ELO: 1850</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -75,7 +111,7 @@
         </div>
       </div>
     </div>
-
+  </div>
     <div class="bottom-bar">
       <button class="nav-btn" @click="handleHome">
         <img src="../../../img/home.png" alt="Home" class="icon">
@@ -86,9 +122,12 @@
       <button class="nav-btn" @click="showFriendsModal = true">
         <img src="../../../img/friends.png" alt="friends" class="icon">
       </button>
+      <!-- Add reset button -->
+      <button class="nav-btn reset-btn" @click="resetGame">
+        <img src="../../../img/reset.png" alt="Reset" class="icon">
+      </button>
       <div class="timer">{{ formatTime(timeLeft) }}</div>
     </div>
-  </div>
 </template>
 
 <script setup>
@@ -178,14 +217,40 @@ const matchHistory = ref([
     winner: 'loss'
   }
 ]);
+
+const resetGame = async () => {
+  // Get reference to ChessBoard component
+  const chessBoardRef = ref(null);
+  if (chessBoardRef.value) {
+    await chessBoardRef.value.initializeGame();
+  }
+  // Reset timer if needed
+  timeLeft.value = 600;
+};
 </script>
 
 <style scoped>
+
+.side-img {
+  position: absolute;
+  width: 343px;
+  height: 343px;
+  top: 25%;
+  z-index: 1;
+}
+.left {
+  left: -172px;
+}
+.right {
+  right: -172px;
+}
+
 .game-container {
-  height: 100vh;
+  height: calc(100vh - 60px); 
   display: flex;
-  flex-direction: column;
-  overflow: hidden; 
+  justify-content: center;
+  align-items: center;
+  padding: 0;
 }
 
 .game-board {
@@ -212,6 +277,7 @@ const matchHistory = ref([
   align-items: center;
   padding: 0  1rem;
   gap: 1rem;
+  bottom: 50px
 }
 
 .nav-btn {
@@ -378,16 +444,14 @@ const matchHistory = ref([
   width: 300px;
   position: fixed;
   top: 5%;
-  left: 30%;
-  transform: translateX(-50%);
+  left: 25%;
 }
 
 .history-window {
   width: 500px;
   position: fixed;
   top: 35%;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 40%;
 }
 
 .profile-content {
@@ -399,9 +463,9 @@ const matchHistory = ref([
 }
 
 .profile-image {
-  width: 120px;
-  height: 120px;
-  border-radius: 60px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
   overflow: hidden;
   border: 3px solid #9370DB;
 }
@@ -420,12 +484,12 @@ const matchHistory = ref([
 .username {
   margin: 0;
   color: #9370DB;
-  font-size: 1.5rem;
+  font-size: 1.2rem;
 }
 
 .elo-rating {
   margin-top: 0.5rem;
-  font-size: 1.2rem;
+  font-size: 1rem;
   color: #ffffff;
 }
 
@@ -471,5 +535,33 @@ const matchHistory = ref([
 
 .match-result.loss {
   background-color: #f44336;
+}
+
+.game-layout {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.player-window {
+  width: 250px;
+}
+
+.opponent-window {
+  margin-bottom: 20px;
+}
+
+.players-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.reset-btn:hover {
+  background-color: rgba(147, 112, 219, 0.2);
+  border-radius: 4px;
 }
 </style>

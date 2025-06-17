@@ -13,11 +13,11 @@
 
     <div class="login-container">
       <img class="icon" src="../../../img/home.png"/>
-      <form class="form-box" @submit.prevent="handleLogin">
+      <form class="form-box" @submit.prevent="">
         <input v-model="email" type="email" placeholder="Email" class="input-box" required/>
         <input v-model="password" type="password" placeholder="Password" class="input-box" required/>
         <div class="buttons">
-          <button type="submit" class="button login">Login</button>
+          <button type="button" @click="handleLogin" class="button login">Login</button>
           <button type="button" @click="handleRegister" class="button register">Register</button>
         </div> 
       </form>
@@ -35,11 +35,11 @@ const router = useRouter()
 const email = ref('')
 const password = ref('')
 
-async function handleLogin() {
+function handleLogin() {
   try {
     console.log('Login attempted');
     console.log('Current route:', router.currentRoute.value.path);
-    const result = await router.push('/game');
+    const result = router.push('/game');
     console.log('Navigation result:', result);
   } catch (error) {
     console.error('Navigation failed:', error);
@@ -168,7 +168,7 @@ async function handleLogin() {
   position: absolute;
   width: 343px;
   height: 343px;
-  top: 318px;
+  top: 25%;
   filter: blur(2px);
   z-index: 1;
 }
@@ -204,7 +204,7 @@ async function handleLogin() {
 
 .login-container {
   position: absolute;
-  top: 300px;
+  top: 30%;
   left: 50%;
   transform: translateX(-50%);
   width: 406.25px;
