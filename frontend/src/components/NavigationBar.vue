@@ -69,7 +69,7 @@
                 <span :class="{'current-player': match.player1 === 'GrandMaster_Flash'}">
                   {{ match.player1 }} ({{ match.elo1 }})
                 </span>
-                <span class="vs">vs</span>
+                <span class="vs">vs </span>
                 <span :class="{'current-player': match.player2 === 'GrandMaster_Flash'}">
                   {{ match.player2 }} ({{ match.elo2 }})
                 </span>
@@ -108,7 +108,7 @@ const matchHistory = ref([
   {
     id: 1,
     player1: 'GrandMaster_Flash',
-    player2: 'ChessWizard',
+    player2: ' ChessWizard',
     elo1: 1850,
     elo2: 1820,
     winner: 'win'
