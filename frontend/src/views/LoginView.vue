@@ -77,15 +77,15 @@ async function handleLogin() {
     const data = await response.json();
 
     if (data.status === 'success') {
-      // Store user data
-      localStorage.setItem('user', JSON.stringify({
+      // Store user data in localStorage
+      localStorage.setItem('userData', JSON.stringify({
         id: data.user.id,
         username: data.user.username,
-        email: data.user.email
+        email: data.user.email,
+        elo: data.user.elo || 1200 // Default ELO if not provided
       }));
       
-      // Navigate to game page
-      await router.push('/game');
+      await router.push('/hub');
     } else {
       alert(data.message || 'Login failed');
     }

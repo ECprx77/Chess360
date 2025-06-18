@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import GameView from './views/GameView.vue'
 import LoginView from './views/LoginView.vue'
+import HubView from './views/HubView.vue'
 
 const routes = [
   { 
@@ -14,6 +15,12 @@ const routes = [
     path: '/game', 
     name: 'Game',
     component: GameView,
+    meta: { requiresAuth: true }
+  },
+  { 
+    path: '/hub', 
+    name: 'Gamehub',
+    component: HubView,
     meta: { requiresAuth: true }
   }
 ]
