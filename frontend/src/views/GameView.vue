@@ -276,6 +276,21 @@ onMounted(() => {
   right: -172px;
 }
 
+
+.side-img {
+  position: absolute;
+  width: 343px;
+  height: 343px;
+  top: 25%;
+  z-index: 1;
+}
+.left {
+  left: -172px;
+}
+.right {
+  right: -172px;
+}
+
 .game-container {
   min-height: 100vh;
   display: flex;
@@ -326,6 +341,7 @@ onMounted(() => {
   align-items: center;
   padding: 0  1rem;
   gap: 1rem;
+  bottom: 50px
   bottom: 50px
 }
 
@@ -415,6 +431,9 @@ onMounted(() => {
   width: 100px;
   height: 100px;
   border-radius: 50%;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
   overflow: hidden;
   border: 3px solid #9370DB;
 }
@@ -434,10 +453,12 @@ onMounted(() => {
   margin: 0;
   color: #9370DB;
   font-size: 1.2rem;
+  font-size: 1.2rem;
 }
 
 .elo-rating {
   margin-top: 0.5rem;
+  font-size: 1rem;
   font-size: 1rem;
   color: #ffffff;
 }
