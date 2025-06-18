@@ -1,0 +1,372 @@
+<template>
+  <div>
+    <div class="bottom-bar">
+      <button class="nav-btn" @click="handleHome">
+        <img src="../../../img/home.png" alt="Home" class="icon">
+      </button>
+      <button class="nav-btn" @click="toggleProfile">
+        <img src="../../../img/profile.png" alt="Profile" class="icon">
+      </button>
+      <button class="nav-btn" @click="toggleFriends">
+        <img src="../../../img/friends.png" alt="friends" class="icon">
+      </button>
+      <div class="timer">{{ formatTime(timeLeft) }}</div>
+    </div>
+
+    <!-- Friends Modal -->
+    <div v-if="showFriendsModal" class="modal-overlay">
+      <div class="window-container">
+        <div class="window-header">
+          <div class="window-title">Friends List</div>
+          <div class="window-controls">
+            <button class="control-button close" @click="toggleFriends">×</button>
+          </div>
+        </div>
+        <div class="window-content">
+          <ul class="friends-list">
+            <li v-for="friend in friends" :key="friend.id" class="friend-item">
+              {{ friend.name }}
+              <button class="invite-button">Invite</button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div v-if="showProfileModal" class="modal-overlay">
+      <!-- Profile Info Window -->
+      <div class="window-container profile-window">
+        <div class="window-header">
+          <div class="window-title">Profile</div>
+          <div class="window-controls">
+            <button class="control-button close" @click="toggleProfile">×</button>
+          </div>
+        </div>
+        <div class="window-content profile-content">
+          <div class="profile-image">
+            <img src="../../../img/default-avatar.png" alt="Profile" class="avatar">
+          </div>
+          <div class="profile-info">
+            <h2 class="username">GrandMaster_Flash</h2>
+            <div class="elo-rating">ELO: 1850</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Match History Window -->
+      <div class="window-container history-window">
+        <div class="window-header">
+          <div class="window-title">Match History</div>
+          <div class="window-controls">
+            <button class="control-button minimize">−</button>
+          </div>
+        </div>
+        <div class="window-content">
+          <ul class="match-list">
+            <li v-for="match in matchHistory" :key="match.id" class="match-item">
+              <div class="match-players">
+                <span :class="{'current-player': match.player1 === 'GrandMaster_Flash'}">
+                  {{ match.player1 }} ({{ match.elo1 }})
+                </span>
+                <span class="vs">vs</span>
+                <span :class="{'current-player': match.player2 === 'GrandMaster_Flash'}">
+                  {{ match.player2 }} ({{ match.elo2 }})
+                </span>
+              </div>
+              <div class="match-result" :class="match.winner">
+                {{ match.winner === 'win' ? 'Victory' : 'Defeat' }}
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+
+const emit = defineEmits(['home']);
+const timeLeft = ref(600);
+let timerInterval;
+
+const showFriendsModal = ref(false);
+const showProfileModal = ref(false);
+
+// Mock data
+const friends = ref([
+  { id: 1, name: 'Alice' },
+  { id: 2, name: 'Bob' },
+  { id: 3, name: 'Charlie' },
+  { id: 4, name: 'Diana' },
+  { id: 5, name: 'Eve' }
+]);
+
+const matchHistory = ref([
+  {
+    id: 1,
+    player1: 'GrandMaster_Flash',
+    player2: 'ChessWizard',
+    elo1: 1850,
+    elo2: 1820,
+    winner: 'win'
+  },
+  // ... Add more match history items
+]);
+
+const formatTime = (seconds) => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
+const handleHome = () => emit('home');
+const toggleProfile = () => showProfileModal.value = !showProfileModal.value;
+const toggleFriends = () => showFriendsModal.value = !showFriendsModal.value;
+
+const startTimer = () => {
+  timerInterval = setInterval(() => {
+    if (timeLeft.value > 0) {
+      timeLeft.value--;
+    }
+  }, 1000);
+};
+
+onMounted(() => {
+  startTimer();
+});
+
+onUnmounted(() => {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+  }
+});
+</script>
+
+<style scoped>
+.bottom-bar {
+  height: 60px;
+  background-color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  gap: 1rem;
+  width: 100%;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+}
+
+.timer {
+  margin-left: auto;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.reset-btn:hover {
+  background-color: rgba(147, 112, 219, 0.2);
+  border-radius: 4px;
+}
+
+/* Modal and Window Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.window-container {
+  background-color: #2a2a2a;
+  border: 1px solid #9370DB;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.window-header {
+  background-color: #232323;
+  height: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1px solid #9370DB;
+  user-select: none;
+}
+
+.window-title {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.window-controls {
+  display: flex;
+}
+
+.control-button {
+  background: none;
+  border: none;
+  color: #7a5fbf;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.control-button:hover {
+  background-color: #4a4a4a;
+}
+
+.close:hover {
+  background-color: #9370DB;
+}
+
+.window-content {
+  padding: 15px;
+  background-color: #2a2a2a;
+}
+
+.profile-window {
+  width: 300px;
+  position: fixed;
+  top: 5%;
+  left: 25%;
+}
+
+.history-window {
+  width: 500px;
+  position: fixed;
+  top: 35%;
+  left: 40%;
+}
+
+.profile-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.profile-image {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #9370DB;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-info {
+  color: #ffffff;
+}
+
+.username {
+  margin: 0;
+  color: #9370DB;
+  font-size: 1.2rem;
+}
+
+.elo-rating {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+}
+
+.match-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.match-item {
+  color: #ffffff;
+  background-color: #232323;
+  margin-bottom: 2px;
+}
+
+.match-players {
+  color: #ffffff;
+}
+
+.vs {
+  color: #9370DB;
+}
+
+.current-player {
+  color: #9370DB;
+  font-weight: bold;
+}
+
+.match-result {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.match-result.win {
+  background-color: #4CAF50;
+}
+
+.match-result.loss {
+  background-color: #f44336;
+}
+
+.friends-list {
+  list-style: none;
+  width: 400px;
+  padding: 0;
+  margin: 0;
+}
+
+.friend-item {
+  color: #ffffff;
+  background-color: #2a2a2a;
+  margin-bottom: 2px;
+}
+
+.friend-item:last-child {
+  border-bottom: none;
+}
+
+.invite-button {
+  background-color: #9370DB;
+  border: none;
+  color: #ffffff;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.invite-button:hover {
+  background-color: #7a5fbf;
+}
+</style>

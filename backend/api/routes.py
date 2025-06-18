@@ -2,14 +2,18 @@ from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 from pydantic import BaseModel
 from ChessGame import ChessGame
+import chess
 
-router = APIRouter(
-    prefix="/chess",
-    tags=["Chess"]
-)
+router = APIRouter()
 
 class MoveRequest(BaseModel):
     move: str
+
+class SquareRequest(BaseModel):
+    square: str  # e.g. "e2" in algebraic notation
+
+class GameStartRequest(BaseModel):
+    variant: str = "standard"  # default to standard chess
 
 # Create a global game instance
 game = ChessGame()
@@ -25,8 +29,10 @@ async def get_game() -> Dict[str, str]:
     return {"message": "Welcome to Chess 360!"}
 
 @router.post("/game/start")
-async def start_game() -> Dict[str, Any]:
-    """Start a new chess game."""
+async def start_game(game_request: GameStartRequest) -> Dict[str, Any]:
+    """Start a new chess game with specified variant"""
+    global game
+    game = ChessGame(variant=game_request.variant)
     return game.reset_game()
 
 @router.post("/game/move")
@@ -101,3 +107,16 @@ async def forfeit_game() -> Dict[str, str]:
     """Forfeit the chess game."""
     game.forfeit_game()
     return {"message": "Forfeited chess game!"}
+
+@router.post("/game/legal-moves")
+async def get_legal_moves_from(move_request: SquareRequest) -> Dict[str, Any]:
+    """Get legal moves for a piece on a specific square."""
+    legal_moves = []
+    try:
+        square = chess.parse_square(move_request.square)
+        for move in game.board.legal_moves:
+            if move.from_square == square:
+                legal_moves.append(move.uci())
+        return {"legal_moves": legal_moves}
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid square format")

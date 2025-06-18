@@ -5,34 +5,31 @@ header('Access-Control-Allow-Methods: POST');
 header('Access-Control-Allow-Headers: Access-Control-Allow-Headers,Content-Type,Access-Control-Allow-Methods');
 
 // Database connection
-$conn = new mysqli('localhost', 'your_username', 'your_password', 'chess360_db');
+require_once 'config.php';
 
-if ($conn->connect_error) {
-    die(json_encode(['error' => 'Connection failed']));
-}
-
-// Get POST data
 $data = json_decode(file_get_contents("php://input"));
 
 if(isset($data->email) && isset($data->password)) {
-    $email = mysqli_real_escape_string($conn, $data->email);
-    $password = $data->password;
-
-    $sql = "SELECT id, password FROM users WHERE email = ?";
+    $sql = "SELECT id, username, email, password FROM users WHERE email = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $email);
+    $stmt->bind_param("s", $data->email);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if($result->num_rows > 0) {
         $user = $result->fetch_assoc();
-        if(password_verify($password, $user['password'])) {
+        if(password_verify($data->password, $user['password'])) {
             echo json_encode([
                 'status' => 'success',
-                'user_id' => $user['id']
+                'message' => 'Login successful',
+                'user' => [
+                    'id' => $user['id'],
+                    'username' => $user['username'],
+                    'email' => $user['email']
+                ]
             ]);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Invalid credentials']);
+            echo json_encode(['status' => 'error', 'message' => 'Invalid password']);
         }
     } else {
         echo json_encode(['status' => 'error', 'message' => 'User not found']);
