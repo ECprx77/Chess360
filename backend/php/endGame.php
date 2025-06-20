@@ -1,33 +1,46 @@
 <?php
+/**
+ * Game Completion Endpoint
+ * 
+ * Handles game completion by updating game status, calculating ELO rating changes,
+ * and cleaning up active game records. Supports checkmate, draw, and abandonment.
+ */
+
 require_once 'config.php';
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Set JSON header
+// Set JSON response header
 header('Content-Type: application/json');
 
+// Parse incoming JSON data
 $data = json_decode(file_get_contents("php://input"));
 
-if(!isset($data->gameId)) {
+// Validate required input parameters
+if (!isset($data->gameId) || !isset($data->status)) {
     http_response_code(400);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Missing required field: gameId'
+        'message' => 'Missing required fields: gameId, status'
     ]);
     exit;
 }
 
+$gameId = $data->gameId;
+$status = $data->status;
+$winnerId = $data->winnerId ?? null;
+
 try {
     $conn->begin_transaction();
 
-    // First check if game exists and get players
-    $checkSql = "SELECT status FROM games WHERE id = ?";
-    $checkStmt = $conn->prepare($checkSql);
-    $checkStmt->bind_param("i", $data->gameId);
-    $checkStmt->execute();
-    $result = $checkStmt->get_result();
+    // Fetch and lock game record to prevent race conditions
+    $sql = "SELECT * FROM games WHERE id = ? FOR UPDATE";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $gameId);
+    $stmt->execute();
+    $result = $stmt->get_result();
     
     if ($result->num_rows === 0) {
         throw new Exception("Game not found");
@@ -35,29 +48,63 @@ try {
     
     $game = $result->fetch_assoc();
     
-    // If game is already completed or abandoned, just return success
+    // Check if game is already completed
     if ($game['status'] !== 'ongoing') {
         echo json_encode(['status' => 'success', 'message' => 'Game already ended']);
+        $conn->commit();
         exit;
     }
 
-    // Update game status to abandoned and delete active game
-    $sql = "UPDATE games 
-            SET status = 'abandoned', 
-                end_time = CURRENT_TIMESTAMP
-            WHERE id = ? AND status = 'ongoing'";
-            
+    // Update game status and set end time
+    $sql = "UPDATE games SET status = ?, winner_id = ?, end_time = CURRENT_TIMESTAMP WHERE id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $data->gameId);
-    
-    if(!$stmt->execute()) {
+    $stmt->bind_param("sii", $status, $winnerId, $gameId);
+    if (!$stmt->execute()) {
         throw new Exception("Failed to update game status");
     }
 
-    // Delete from active_games
+    // Calculate and update ELO ratings for completed games with a winner
+    if ($status === 'completed' && $winnerId) {
+        $loserId = ($winnerId == $game['white_player_id']) ? $game['black_player_id'] : $game['white_player_id'];
+
+        // Retrieve current ELO ratings for both players
+        $sql = "SELECT id, elo_rating FROM users WHERE id IN (?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $winnerId, $loserId);
+        $stmt->execute();
+        $players = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $winnerElo = 0;
+        $loserElo = 0;
+        foreach ($players as $player) {
+            if ($player['id'] == $winnerId) {
+                $winnerElo = $player['elo_rating'];
+            } else {
+                $loserElo = $player['elo_rating'];
+            }
+        }
+
+        // Calculate new ELO ratings using standard formula
+        $k = 32;  // K-factor determines rating change sensitivity
+        $winnerExpected = 1 / (1 + pow(10, ($loserElo - $winnerElo) / 400));
+        $loserExpected = 1 / (1 + pow(10, ($winnerElo - $loserElo) / 400));
+        
+        $newWinnerElo = $winnerElo + $k * (1 - $winnerExpected);
+        $newLoserElo = $loserElo + $k * (0 - $loserExpected);
+
+        // Update ELO ratings in database
+        $sql = "UPDATE users SET elo_rating = ? WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("di", $newWinnerElo, $winnerId);
+        $stmt->execute();
+        $stmt->bind_param("di", $newLoserElo, $loserId);
+        $stmt->execute();
+    }
+
+    // Remove game from active games table
     $sql = "DELETE FROM active_games WHERE game_id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $data->gameId);
+    $stmt->bind_param("i", $gameId);
     
     if(!$stmt->execute()) {
         throw new Exception("Failed to delete active game");

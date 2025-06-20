@@ -1,20 +1,25 @@
 <template>
+  <!-- Main game view with chess board and player information -->
   <div class="game-container">
+    <!-- Chess board component (shown when game starts) -->
     <div class="game-area" v-show="isGameStarted">
       <ChessBoard 
         ref="chessBoardRef"
         :player-color="playerColor || 'white'"
         :game-id="gameId || ''"
+        @game-over="onGameOver"
       />
     </div>
 
+    <!-- Matchmaking status message -->
     <div v-show="!isGameStarted" class="searching-message">
       Searching for opponent...
     </div>
     
+    <!-- Player information windows (shown when game starts) -->
     <template v-if="isGameStarted">
-      <div class="players-container">
-        <!-- Opponent Info Window -->
+      <!-- Opponent information window (left side) -->
+      <div class="opponent-container">
         <div class="window-container player-window opponent-window">
           <div class="window-header">
             <div class="window-title">{{ opponent?.username || 'Opponent' }}</div>
@@ -30,8 +35,10 @@
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Player Info Window -->
+      <!-- Current player information window (right side) -->
+      <div class="player-container">
         <div class="window-container player-window">
           <div class="window-header">
             <div class="window-title">You</div>
@@ -50,12 +57,35 @@
       </div>
     </template>
 
-    <NavigationBar @home="handleHome" :showTimer="false" />
+    <!-- Game over modal with result display -->
+    <div v-if="showGameOverModal" class="modal-overlay">
+      <div class="window-container game-over-window">
+        <div class="window-header">
+          <div class="window-title">Game Over</div>
+        </div>
+        <div class="window-content game-over-content">
+          <h2 class="game-over-title">{{ gameOverMessage }}</h2>
+          <p class="game-over-status">Status: {{ gameOverData.status }}</p>
+          <button @click="closeGameOverModal" class="close-button">Return to Hub</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom navigation bar -->
+    <NavigationBar @home="handleHome" :showTimer="false" class="footer-nav" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+/**
+ * Game View Component
+ * 
+ * Handles the complete chess game experience including matchmaking,
+ * game state management, player information display, and game over handling.
+ * Manages the transition from searching for opponents to active gameplay.
+ */
+
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import ChessBoard from '@/components/ChessBoard.vue';
 import NavigationBar from '@/components/NavigationBar.vue';
@@ -63,22 +93,85 @@ import { useUser } from '@/composables/useUser';
 
 const router = useRouter();
 const { userData } = useUser();
+
+// Component references and reactive state
 const chessBoardRef = ref(null);
 const opponent = ref(null);
 const gameId = ref('');  // Initialize as empty string
 const playerColor = ref('white');  // Initialize with default color
 let matchmakingInterval;
 
+// Game state and timing
 const playerTime = ref(600);
 const opponentTime = ref(600);
 const isGameStarted = ref(false);
+const showGameOverModal = ref(false);
+const gameOverData = ref(null);
+const gameCompleted = ref(false);
 
+/**
+ * Computed property for game over message based on result
+ */
+const gameOverMessage = computed(() => {
+  if (!gameOverData.value) return '';
+  const { status, winnerId } = gameOverData.value;
+  if (status === 'draw') {
+    return "It's a Draw!";
+  }
+  if (winnerId === userData.value?.id) {
+    return 'You Won!';
+  }
+  return 'You Lost!';
+});
+
+/**
+ * Format time in seconds to MM:SS display format
+ * @param {number} seconds - Time in seconds
+ * @returns {string} Formatted time string
+ */
 const formatTime = (seconds) => {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
+/**
+ * Handle game over event from chess board
+ * @param {Object} data - Game over data from server
+ */
+const onGameOver = (data) => {
+  gameOverData.value = data;
+  showGameOverModal.value = true;
+  gameCompleted.value = true;
+};
+
+/**
+ * Close game over modal and handle game completion
+ * Sends game end data to server and navigates back to hub
+ */
+const closeGameOverModal = async () => {
+  showGameOverModal.value = false;
+  if (gameOverData.value) {
+    try {
+      await fetch('http://localhost/php/endGame.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameId: gameOverData.value.gameId,
+          status: gameOverData.value.status,
+          winnerId: gameOverData.value.winnerId
+        })
+      });
+    } catch (error) {
+      console.error('Failed to end game:', error);
+    }
+  }
+  router.push('/hub');
+};
+
+/**
+ * Start matchmaking process by joining the queue
+ */
 const startMatchmaking = async () => {
   try {
     const response = await fetch('http://localhost/php/joinQueue.php', {
@@ -100,7 +193,10 @@ const startMatchmaking = async () => {
   }
 };
 
-// Update the checkForMatch function
+/**
+ * Check for available matches in the queue
+ * Handles match found scenario and game initialization
+ */
 const checkForMatch = async () => {
   try {
     const response = await fetch('http://localhost/php/checkMatch.php', {
@@ -113,20 +209,20 @@ const checkForMatch = async () => {
     console.log('Match check response:', data);
 
     if (data.status === 'matched') {
-      // Clear interval immediately when match is found
+      // Stop matchmaking interval when match is found
       if (matchmakingInterval) {
         clearInterval(matchmakingInterval);
         matchmakingInterval = null;
       }
 
-      // Remove from queue
+      // Remove player from queue
       await fetch('http://localhost/php/leaveQueue.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userData.value?.id })
       });
 
-      // Set game state
+      // Initialize game state with match data
       gameId.value = String(data.gameId);
       opponent.value = data.opponent;
       playerColor.value = data.isWhite ? 'white' : 'black';
@@ -134,6 +230,7 @@ const checkForMatch = async () => {
       
       await nextTick();
 
+      // Initialize chess board with starting position
       if (data.fen) {
         console.log('Initializing board with FEN:', data.fen);
         if (chessBoardRef.value) {
@@ -198,6 +295,12 @@ const handleHome = () => router.push('/');
 const handleGameEnd = async () => {
   if (!gameId.value || !userData.value?.id) return;
   
+  // Don't mark as abandoned if game is already completed
+  if (gameCompleted.value || showGameOverModal.value || gameOverData.value) {
+    console.log('Game already completed, not marking as abandoned');
+    return;
+  }
+  
   try {
     const response = await fetch('http://localhost/php/endGame.php', {
       method: 'POST',
@@ -261,19 +364,43 @@ onUnmounted(() => {
 
 <style scoped>
 .game-container {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  padding-bottom: 80px; /* Space for footer nav */
+  box-sizing: border-box;
   position: relative;
 }
 
-.players-container {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.game-area {
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.opponent-container {
   position: fixed;
-  right: 20px;
   top: 20px;
+  left: 20px;
+  z-index: 10;
+}
+
+.player-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+}
+
+.player-window {
+  width: 250px;
+}
+
+.opponent-window {
+  margin-bottom: 0;
 }
 
 .window-container {
@@ -284,10 +411,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.player-window {
-  width: 250px;
-}
-
 .window-header {
   background-color: #333333;
   height: 32px;
@@ -296,15 +419,18 @@ onUnmounted(() => {
   align-items: center;
   padding: 0 10px;
   border-bottom: 1px solid #9370DB;
+  user-select: none;
 }
 
 .window-title {
   color: #ffffff;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .window-content {
   padding: 15px;
+  background-color: #2a2a2a;
 }
 
 .profile-content {
@@ -331,6 +457,7 @@ onUnmounted(() => {
 
 .profile-info {
   text-align: center;
+  color: #ffffff;
 }
 
 .username {
@@ -341,45 +468,76 @@ onUnmounted(() => {
 
 .elo-rating {
   margin-top: 0.5rem;
+  font-size: 1rem;
   color: #ffffff;
 }
 
 .timer {
-  color: #ffffff;
+  font-size: 18px;
   font-weight: bold;
-}
-
-.game-area {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.position-info {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #2a2a2a;
-  padding: 8px 16px;
-  border-radius: 4px;
-  border: 1px solid #9370DB;
-  color: white;
+  color: #ffffff;
 }
 
 .searching-message {
+  font-size: 24px;
+  color: #fff;
+  text-align: center;
+  margin-top: 50px;
+}
+
+.footer-nav {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: rgba(42, 42, 42, 0.9);
-  padding: 20px 40px;
-  border-radius: 8px;
-  border: 1px solid #9370DB;
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: bold;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
   z-index: 1000;
+}
+
+.game-over-window {
+  width: 320px;
+  text-align: center;
+  border: 1px solid #9370DB;
+  border-radius: 8px;
+  background: #2a2a2a;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.game-over-content {
+  padding: 1.5rem;
+  background: #2a2a2a;
+}
+
+.game-over-title {
+  font-size: 24px;
+  margin-bottom: 10px;
+  color: #9370DB;
+}
+
+.game-over-status {
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+.close-button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
 }
 </style>

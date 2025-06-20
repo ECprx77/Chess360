@@ -1,16 +1,19 @@
 <template>
+  <!-- Login page with registration popup -->
   <div class="login-page">
     <div class="background-blur"/>
 
-
+    <!-- Decorative side images -->
     <img class="side-img left" src="../../../img/Chess360.png"/>
     <img class="side-img right" src="../../../img/Chess360.png"/>
 
+    <!-- Page header with title and logo -->
     <div class="header">
       <div class="title">Chess360</div>
       <img class="logo" src="../../../img/Chess360.png"/>
     </div>
 
+    <!-- Main login form container -->
     <div class="login-container">
       <img class="icon" src="../../../img/home.png"/>
       <form class="form-box" @submit.prevent="">
@@ -23,7 +26,7 @@
       </form>
     </div>
 
-    <!-- Register Popup -->
+    <!-- Registration popup modal -->
     <div v-if="showRegisterPopup" class="popup-overlay">
       <div class="popup-container">
         <div class="popup-header">
@@ -45,14 +48,23 @@
 </template>
 
 <script setup>
+/**
+ * Login View Component
+ * 
+ * Handles user authentication and registration with a modal popup.
+ * Provides login form and registration functionality with form validation.
+ */
+
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+
+// Login form data
 const email = ref('')
 const password = ref('')
 
-// refs for registration
+// Registration modal and form data
 const showRegisterPopup = ref(false)
 const registerData = ref({
   username: '',
@@ -61,6 +73,10 @@ const registerData = ref({
   confirmPassword: ''
 })
 
+/**
+ * Handle user login with email and password
+ * Stores user data in localStorage and redirects to hub on success
+ */
 async function handleLogin() {
   try {
     const response = await fetch('http://localhost/php/login.php', {
@@ -77,14 +93,15 @@ async function handleLogin() {
     const data = await response.json();
 
     if (data.status === 'success') {
-      // Store user data in localStorage
+      // Store user data in localStorage for session management
       localStorage.setItem('userData', JSON.stringify({
         id: data.user.id,
         username: data.user.username,
         email: data.user.email,
-        elo: data.user.elo || 1200 // Default ELO if not provided
+        elo: data.user.elo || 1200 // Default ELO rating if not provided
       }));
       
+      // Redirect to main hub after successful login
       await router.push('/hub');
     } else {
       alert(data.message || 'Login failed');
@@ -95,7 +112,12 @@ async function handleLogin() {
   }
 }
 
+/**
+ * Handle user registration with form validation
+ * Creates new account and auto-fills login form on success
+ */
 async function handleRegisterSubmit() {
+  // Validate password confirmation
   if (registerData.value.password !== registerData.value.confirmPassword) {
     alert('Passwords do not match!')
     return
@@ -119,6 +141,7 @@ async function handleRegisterSubmit() {
     if (data.status === 'success') {
       alert('Registration successful! Please log in.');
       showRegisterPopup.value = false;
+      // Auto-fill login form with new credentials
       email.value = registerData.value.email;
       password.value = registerData.value.password;
     } else {
@@ -132,6 +155,13 @@ async function handleRegisterSubmit() {
 </script>
 
 <style scoped>
+/**
+ * Login Page Styles
+ * 
+ * Provides a modern, blurred background design with centered
+ * login form and decorative elements.
+ */
+
 .login-page {
   position: relative;
   width: 100vw;
@@ -156,7 +186,6 @@ async function handleRegisterSubmit() {
   position: absolute;
   bottom: 0;
   width: 100%;
-
   height: 70px;
   background: #9875CD;
   border-top-left-radius: 10px;
@@ -169,7 +198,6 @@ async function handleRegisterSubmit() {
   position: absolute;
   width: 343px;
   height: 343px;
-  top: 25%;
   top: 25%;
   filter: blur(2px);
   z-index: 1;

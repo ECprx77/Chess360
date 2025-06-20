@@ -1,5 +1,7 @@
 <template>
+  <!-- Main navigation bar with modal windows -->
   <div>
+    <!-- Bottom navigation bar with action buttons -->
     <div class="bottom-bar">
       <button class="nav-btn" @click="handleHome">
         <img src="../../../img/home.png" alt="Home" class="icon">
@@ -12,9 +14,9 @@
       </button>
     </div>
 
-    <!-- Friends Modal -->
+    <!-- Friends Management Modal -->
     <div v-if="showFriendsModal" class="modal-overlay">
-      <!-- Existing Friends List Window -->
+      <!-- Friends List Window -->
       <div class="window-container friends-list-window">
         <div class="window-header">
           <div class="window-title">Friends List</div>
@@ -37,7 +39,7 @@
         </div>
       </div>
 
-      <!-- Add Friend Window -->
+      <!-- Add Friend Search Window -->
       <div class="window-container search-window">
         <div class="window-header">
           <div class="window-title">Add Friend</div>
@@ -68,7 +70,7 @@
         </div>
       </div>
 
-      <!-- Friend Requests Window -->
+      <!-- Friend Requests Management Window -->
       <div class="window-container requests-window">
         <div class="window-header">
           <div class="window-title">Friend Requests</div>
@@ -90,9 +92,9 @@
       </div>
     </div>
 
-    <!-- Profile Modal with Match History -->
+    <!-- Profile and Match History Modal -->
     <div v-if="showProfileModal" class="modal-overlay">
-      <!-- Profile Info Window -->
+      <!-- User Profile Information Window -->
       <div class="window-container profile-window">
         <div class="window-header">
           <div class="window-title">Profile</div>
@@ -111,7 +113,7 @@
         </div>
       </div>
 
-      <!-- Match History Window -->
+      <!-- Match History Display Window -->
       <div class="window-container history-window">
         <div class="window-header">
           <div class="window-title">Match History</div>
@@ -127,6 +129,12 @@
           </div>
           <ul v-else class="match-list">
             <li v-for="match in matchHistory" :key="match.id" class="match-item">
+              <div class="match-header">
+                <div class="match-date">{{ formatMatchDate(match.start_time) }}</div>
+                <div class="match-result" :class="getMatchResultClass(match)">
+                  {{ getMatchResultText(match) }}
+                </div>
+              </div>
               <div class="match-players">
                 <span :class="{'current-player': match.player1_id === userData?.id}">
                   {{ match.player1_username }} ({{ match.player1_elo }})
@@ -136,16 +144,13 @@
                   {{ match.player2_username }} ({{ match.player2_elo }})
                 </span>
               </div>
-              <div class="match-result" :class="match.winner_id === userData?.id ? 'win' : 'loss'">
-                {{ match.winner_id === userData?.id ? 'Victory' : 'Defeat' }}
-              </div>
             </li>
           </ul>
         </div>
       </div>
     </div>
 
-    <!-- Search Window -->
+    <!-- Standalone Search Window -->
     <div v-if="showSearchWindow" class="modal-overlay">
       <div class="window-container search-window">
         <div class="window-header">
@@ -177,7 +182,7 @@
       </div>
     </div>
 
-    <!-- Requests Window -->
+    <!-- Standalone Friend Requests Window -->
     <div v-if="showRequestsWindow" class="modal-overlay">
       <div class="window-container requests-window">
         <div class="window-header">
@@ -208,24 +213,35 @@
 </template>
 
 <script setup>
+/**
+ * Navigation Bar Component
+ * 
+ * Provides bottom navigation with modal windows for profile management,
+ * friend system, and match history. Handles all social features and
+ * user interactions outside of the game.
+ */
+
 import { ref, onMounted, defineEmits } from 'vue';
 import { useUser } from '@/composables/useUser';
 
+// Component events and user data
 const emit = defineEmits(['home']);
 const { userData } = useUser();
 
+// Modal visibility states
 const showFriendsModal = ref(false);
 const showProfileModal = ref(false);
 const showSearchWindow = ref(false);
 const showRequestsWindow = ref(false);
 
+// Navigation and modal toggle functions
 const handleHome = () => emit('home');
 const toggleProfile = () => showProfileModal.value = !showProfileModal.value;
 const toggleFriends = () => showFriendsModal.value = !showFriendsModal.value;
 const toggleSearch = () => showSearchWindow.value = !showSearchWindow.value;
 const toggleRequests = () => showRequestsWindow.value = !showRequestsWindow.value;
 
-// Initialize empty states
+// Reactive data for friends, match history, and search
 const friends = ref([]);
 const matchHistory = ref([]);
 const searchResults = ref([]);
@@ -234,7 +250,9 @@ const searchQuery = ref('');
 const searchUsername = ref('');
 const searchResult = ref(null);
 
-// Fetch friends from database
+/**
+ * Fetch user's friends list from the database
+ */
 const fetchFriends = async () => {
   try {
     const response = await fetch('http://localhost/php/getFriends.php', {
@@ -250,7 +268,9 @@ const fetchFriends = async () => {
   }
 };
 
-// Fetch match history from database
+/**
+ * Fetch user's match history from the database
+ */
 const fetchMatchHistory = async () => {
   try {
     const response = await fetch('http://localhost/php/getMatchHistory.php', {
@@ -266,7 +286,9 @@ const fetchMatchHistory = async () => {
   }
 };
 
-// Search for friends by username
+/**
+ * Search for users by username to add as friends
+ */
 const searchFriends = async () => {
   if (!searchQuery.value.trim()) {
     searchResults.value = [];
@@ -287,7 +309,9 @@ const searchFriends = async () => {
   }
 };
 
-// Search user by username
+/**
+ * Search for a specific user by username
+ */
 const searchUser = async () => {
   if (!searchUsername.value) return;
   
@@ -309,7 +333,54 @@ const searchUser = async () => {
   }
 };
 
-// Send a friend request
+/**
+ * Format match date for display with relative time
+ * @param {string} dateString - ISO date string
+ * @returns {string} Formatted date string
+ */
+const formatMatchDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInHours = (now - date) / (1000 * 60 * 60);
+  
+  if (diffInHours < 24) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (diffInHours < 168) { // 7 days
+    return date.toLocaleDateString([], { weekday: 'short' });
+  } else {
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+};
+
+/**
+ * Get CSS class for match result styling
+ * @param {Object} match - Match object
+ * @returns {string} CSS class name
+ */
+const getMatchResultClass = (match) => {
+  if (match.status === 'draw') return 'draw';
+  if (match.winner_id === userData.value?.id) return 'win';
+  if (match.status === 'abandoned') return 'abandoned';
+  return 'loss';
+};
+
+/**
+ * Get display text for match result
+ * @param {Object} match - Match object
+ * @returns {string} Result text
+ */
+const getMatchResultText = (match) => {
+  if (match.status === 'draw') return 'Draw';
+  if (match.status === 'abandoned') return 'Abandoned';
+  if (match.winner_id === userData.value?.id) return 'Victory';
+  return 'Defeat';
+};
+
+/**
+ * Send a friend request to another user
+ * @param {number} recipientId - ID of user to send request to
+ */
 const sendFriendRequest = async (recipientId) => {
   try {
     const response = await fetch('http://localhost/php/sendFriendRequest.php', {
@@ -329,13 +400,18 @@ const sendFriendRequest = async (recipientId) => {
   }
 };
 
-// Ignore a user (do not send friend request)
+/**
+ * Ignore a user (placeholder for future functionality)
+ * @param {number} userId - ID of user to ignore
+ */
 const ignoreUser = (userId) => {
-  // For now, just log the action
   console.log(`Ignored user with ID: ${userId}`);
 };
 
-// Accept a friend request
+/**
+ * Accept a friend request
+ * @param {number} requestId - ID of the friend request
+ */
 const acceptFriendRequest = async (requestId) => {
   try {
     const response = await fetch('http://localhost/php/acceptFriendRequest.php', {
@@ -355,7 +431,10 @@ const acceptFriendRequest = async (requestId) => {
   }
 };
 
-// Decline a friend request
+/**
+ * Decline a friend request
+ * @param {number} requestId - ID of the friend request
+ */
 const declineFriendRequest = async (requestId) => {
   try {
     const response = await fetch('http://localhost/php/declineFriendRequest.php', {
@@ -571,16 +650,57 @@ onMounted(() => {
   margin: 0;
   min-height: 180px;
   max-height: 360px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9370DB #2a2a2a;
+}
+
+.match-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.match-list::-webkit-scrollbar-track {
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+
+.match-list::-webkit-scrollbar-thumb {
+  background: #9370DB;
+  border-radius: 4px;
+}
+
+.match-list::-webkit-scrollbar-thumb:hover {
+  background: #7a5fbf;
 }
 
 .match-item {
   color: #ffffff;
   background-color: #232323;
   margin-bottom: 2px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.match-item:hover {
+  background-color: #2a2a2a;
+}
+
+.match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.match-date {
+  font-size: 0.8rem;
+  color: #888;
 }
 
 .match-players {
   color: #ffffff;
+  font-size: 0.9rem;
 }
 
 .vs {
@@ -604,6 +724,14 @@ onMounted(() => {
 
 .match-result.loss {
   background-color: #f44336;
+}
+
+.match-result.draw {
+  background-color: #FF9800;
+}
+
+.match-result.abandoned {
+  background-color: #9E9E9E;
 }
 
 .friends-list {

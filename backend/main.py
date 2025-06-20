@@ -2,7 +2,12 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router
-from api.socket_manager import sio  # Import the configured sio instance
+from api.socket_manager import sio
+
+"""
+Chess360 Backend Server
+Combines FastAPI for REST endpoints and Socket.IO for real-time game communication.
+"""
 
 # Create FastAPI app
 app = FastAPI(
@@ -15,7 +20,7 @@ app = FastAPI(
     }],
 )
 
-# CORS middleware
+# Configure CORS to allow frontend communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:8080"],
@@ -24,16 +29,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount Socket.IO app using the imported sio instance
+# Mount Socket.IO for real-time game events
 socket_app = socketio.ASGIApp(sio, app)
 
-# Include routes
+# Include REST API routes
 app.include_router(router, prefix="/chess")
 
 @app.get("/", tags=["Root"])
 async def root():
-    """Root endpoint."""
+    """Health check endpoint."""
     return {"message": "Welcome to Chess 360!"}
 
-# Export the socket app
+# Export the combined Socket.IO and FastAPI application
 app = socket_app

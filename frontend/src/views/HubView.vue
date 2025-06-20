@@ -1,13 +1,14 @@
 <template>
+  <!-- Main hub view with desktop-style layout -->
   <div class="game-container">
+    <!-- Decorative background images -->
     <img class="side-img left" src="../../../img/Chess360.png"/>
     <img class="side-img center" src="../../../img/Chess360.png"/>
     <img class="side-img right" src="../../../img/Chess360.png"/>
 
-    <!-- Move players-container outside game-layout -->
+    <!-- Player profile window positioned on the right -->
     <div class="players-container">
       <div class="window-container player-window">
-        <!-- ...existing window content... -->
         <div class="window-header">
           <div class="window-title">You</div>
         </div>
@@ -23,15 +24,25 @@
       </div>
     </div>
 
+    <!-- Main game area with draggable game icon -->
     <div class="game-area">
       <GameIcon :initial-x="0" :initial-y="0" />
     </div>
 
-    <NavigationBar @home="handleHome" />
+    <!-- Bottom navigation bar -->
+    <NavigationBar @home="handleHome" class="footer-nav" />
   </div>
 </template>
 
 <script setup>
+/**
+ * Hub View Component
+ * 
+ * Main application hub that provides a desktop-style interface
+ * with user profile display, draggable game icon, and navigation.
+ * Serves as the central landing page after login.
+ */
+
 import { useRouter } from 'vue-router';
 import NavigationBar from '@/components/NavigationBar.vue';
 import GameIcon from '@/components/GameIcon.vue';
@@ -39,10 +50,21 @@ import { useUser } from '@/composables/useUser';
 
 const router = useRouter();
 const { userData } = useUser();
+
+/**
+ * Handle navigation back to login page
+ */
 const handleHome = () => router.push('/');
 </script>
 
 <style scoped>
+/**
+ * Hub View Styles
+ * 
+ * Provides desktop-style layout with decorative elements,
+ * user profile window, and game area positioning.
+ */
+
 .side-img {
   position: absolute;
   width: 343px;
@@ -69,6 +91,7 @@ const handleHome = () => router.push('/');
   display: flex;
   flex-direction: column;
   position: relative;
+  padding-bottom: 80px; /* Space for footer navigation */
 }
 
 .game-area {
@@ -164,5 +187,13 @@ const handleHome = () => router.push('/');
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.footer-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
 }
 </style>
