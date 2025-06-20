@@ -7,12 +7,9 @@
 *.o
 *.so
 
-# Logs and databases #
+# Logs #
 ######################
 *.log
-
-*.sqlite
-*.sqlite3
 *.bak
 
 # OS generated files #

@@ -100,8 +100,9 @@ cd Chess360
    - Example: `C:\xampp\htdocs\chess360\php\`
 
 2. **Configure Database Connection**:
-   
-   Update `backend/php/config.php` with your MySQL credentials:
+
+   Import the chess360.sql database in phpmyadmin and
+   update `backend/php/config.php` with your MySQL credentials:
    
    ```php
    $host = 'localhost';
@@ -134,7 +135,6 @@ cd Chess360
    
    The frontend will start on `http://localhost:8080`
 
-## Configuration Files
 
 ### Database Credentials
 
