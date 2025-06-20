@@ -310,6 +310,7 @@ ALTER TABLE `matchmaking_queue`
 --
 -- Constraints for table `player_stats`
 --
+
 ALTER TABLE `player_stats`
   ADD CONSTRAINT `player_stats_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 COMMIT;
