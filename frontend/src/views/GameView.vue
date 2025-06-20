@@ -1,60 +1,61 @@
 <template>
   <div class="game-container">
-    <!-- Show loading state while matchmaking -->
-    <div v-if="!opponentFound" class="matchmaking-overlay">
-      <div class="matchmaking-content">
-        <h2>Finding opponent...</h2>
-        <p>Searching for players (ELO: {{ userData?.elo || '1200' }} ±100)</p>
-        <button @click="cancelMatchmaking" class="cancel-button">Cancel</button>
-      </div>
+    <div class="game-area" v-show="isGameStarted">
+      <ChessBoard 
+        ref="chessBoardRef"
+        :player-color="playerColor || 'white'"
+        :game-id="gameId || ''"
+      />
     </div>
 
-    <div class="players-container">
-      <!-- Opponent Info Window -->
-      <div class="window-container player-window opponent-window">
-        <div class="window-header">
-          <div class="window-title">{{ opponent?.username || 'Waiting...' }}</div>
-          <div class="timer">{{ formatTime(opponentTime) }}</div>
-        </div>
-        <div class="window-content profile-content">
-          <div class="profile-image">
-            <img src="../../../img/default-avatar.png" alt="Opponent" class="avatar">
+    <div v-show="!isGameStarted" class="searching-message">
+      Searching for opponent...
+    </div>
+    
+    <template v-if="isGameStarted">
+      <div class="players-container">
+        <!-- Opponent Info Window -->
+        <div class="window-container player-window opponent-window">
+          <div class="window-header">
+            <div class="window-title">{{ opponent?.username || 'Opponent' }}</div>
+            <div class="timer">{{ formatTime(opponentTime) }}</div>
           </div>
-          <div class="profile-info">
-            <h2 class="username">{{ opponent?.username || 'Waiting...' }}</h2>
-            <div class="elo-rating">ELO: {{ opponent?.elo || '---' }}</div>
+          <div class="window-content profile-content">
+            <div class="profile-image">
+              <img src="../../../img/default-avatar.png" alt="Opponent" class="avatar">
+            </div>
+            <div class="profile-info">
+              <h2 class="username">{{ opponent?.username || 'Waiting...' }}</h2>
+              <div class="elo-rating">ELO: {{ opponent?.elo || '---' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Player Info Window -->
+        <div class="window-container player-window">
+          <div class="window-header">
+            <div class="window-title">You</div>
+            <div class="timer">{{ formatTime(playerTime) }}</div>
+          </div>
+          <div class="window-content profile-content">
+            <div class="profile-image">
+              <img src="../../../img/default-avatar.png" alt="You" class="avatar">
+            </div>
+            <div class="profile-info">
+              <h2 class="username">{{ userData?.username || 'Loading...' }}</h2>
+              <div class="elo-rating">ELO: {{ userData?.elo || '1200' }}</div>
+            </div>
           </div>
         </div>
       </div>
-
-      <!-- Player Info Window -->
-      <div class="window-container player-window">
-        <div class="window-header">
-          <div class="window-title">You</div>
-          <div class="timer">{{ formatTime(playerTime) }}</div>
-        </div>
-        <div class="window-content profile-content">
-          <div class="profile-image">
-            <img src="../../../img/default-avatar.png" alt="You" class="avatar">
-          </div>
-          <div class="profile-info">
-            <h2 class="username">{{ userData?.username || 'Loading...' }}</h2>
-            <div class="elo-rating">ELO: {{ userData?.elo || '1200' }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="game-area">
-      <ChessBoard ref="chessBoardRef" />
-    </div>
+    </template>
 
     <NavigationBar @home="handleHome" :showTimer="false" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import ChessBoard from '@/components/ChessBoard.vue';
 import NavigationBar from '@/components/NavigationBar.vue';
@@ -63,12 +64,14 @@ import { useUser } from '@/composables/useUser';
 const router = useRouter();
 const { userData } = useUser();
 const chessBoardRef = ref(null);
-const opponentFound = ref(false);
 const opponent = ref(null);
+const gameId = ref('');  // Initialize as empty string
+const playerColor = ref('white');  // Initialize with default color
 let matchmakingInterval;
 
 const playerTime = ref(600);
 const opponentTime = ref(600);
+const isGameStarted = ref(false);
 
 const formatTime = (seconds) => {
   const minutes = Math.floor(seconds / 60);
@@ -97,6 +100,7 @@ const startMatchmaking = async () => {
   }
 };
 
+// Update the checkForMatch function
 const checkForMatch = async () => {
   try {
     const response = await fetch('http://localhost/php/checkMatch.php', {
@@ -106,10 +110,69 @@ const checkForMatch = async () => {
     });
     
     const data = await response.json();
+    console.log('Match check response:', data);
+
     if (data.status === 'matched') {
-      clearInterval(matchmakingInterval);
-      opponentFound.value = true;
+      // Clear interval immediately when match is found
+      if (matchmakingInterval) {
+        clearInterval(matchmakingInterval);
+        matchmakingInterval = null;
+      }
+
+      // Remove from queue
+      await fetch('http://localhost/php/leaveQueue.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userData.value?.id })
+      });
+
+      // Set game state
+      gameId.value = String(data.gameId);
       opponent.value = data.opponent;
+      playerColor.value = data.isWhite ? 'white' : 'black';
+      isGameStarted.value = true;
+      
+      await nextTick();
+
+      if (data.fen) {
+        console.log('Initializing board with FEN:', data.fen);
+        if (chessBoardRef.value) {
+          await chessBoardRef.value.updateBoardFromFen(data.fen);
+        } else {
+          console.error('Chess board ref not found');
+        }
+        return; // Exit function after initializing board
+      }
+      
+      try {
+        const gameResponse = await fetch('http://localhost:8000/chess/game/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variant: 'chess960' })
+        });
+        
+        if (!gameResponse.ok) {
+          throw new Error(`HTTP error! status: ${gameResponse.status}`);
+        }
+        
+        const gameData = await gameResponse.json();
+        
+        await fetch('http://localhost/php/updateGameFen.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            gameId: gameId.value,
+            fen: gameData.fen 
+          })
+        });
+        
+        if (chessBoardRef.value) {
+          console.log('Initializing board with new FEN:', gameData.fen);
+          await chessBoardRef.value.updateBoardFromFen(gameData.fen);
+        }
+      } catch (error) {
+        console.error('Failed to get/update initial position:', error);
+      }
     }
   } catch (error) {
     console.error('Failed to check match:', error);
@@ -132,17 +195,67 @@ const cancelMatchmaking = async () => {
 
 const handleHome = () => router.push('/');
 
+const handleGameEnd = async () => {
+  if (!gameId.value || !userData.value?.id) return;
+  
+  try {
+    const response = await fetch('http://localhost/php/endGame.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gameId: gameId.value,
+        userId: userData.value.id,
+        status: 'abandoned'
+      })
+    });
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}, message: ${data.message}`);
+    }
+    
+    console.log('Game end response:', data);
+  } catch (error) {
+    console.error('Failed to end game:', error);
+  }
+};
+
+const handleUnload = (event) => {
+  if (isGameStarted.value) {
+    // Show confirmation dialog
+    event.preventDefault();
+    event.returnValue = '';
+    
+    // End the game
+    handleGameEnd();
+  }
+};
+
 onMounted(() => {
   if (userData.value?.id) {
     startMatchmaking();
   } else {
     router.push('/');
   }
+  
+  // Add unload event listener
+  window.addEventListener('beforeunload', handleUnload);
 });
 
 onUnmounted(() => {
-  clearInterval(matchmakingInterval);
-  cancelMatchmaking();
+  if (matchmakingInterval) {
+    clearInterval(matchmakingInterval);
+    matchmakingInterval = null;
+    cancelMatchmaking();
+  }
+  
+  // Remove unload event listener
+  window.removeEventListener('beforeunload', handleUnload);
+  
+  // End game if it's still active
+  if (isGameStarted.value && opponent.value) {
+    handleGameEnd();
+  }
 });
 </script>
 
@@ -236,42 +349,37 @@ onUnmounted(() => {
   font-weight: bold;
 }
 
-.matchmaking-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.matchmaking-content {
-  text-align: center;
-  color: white;
-}
-
-.cancel-button {
-  margin-top: 20px;
-  padding: 10px 20px;
-  background-color: #f44336;
-  border: none;
-  border-radius: 4px;
-  color: white;
-  cursor: pointer;
-}
-
-.cancel-button:hover {
-  background-color: #da190b;
-}
-
 .game-area {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.position-info {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #2a2a2a;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid #9370DB;
+  color: white;
+}
+
+.searching-message {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(42, 42, 42, 0.9);
+  padding: 20px 40px;
+  border-radius: 8px;
+  border: 1px solid #9370DB;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: bold;
+  z-index: 1000;
 }
 </style>

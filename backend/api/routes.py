@@ -3,6 +3,7 @@ from typing import Dict, Any
 from pydantic import BaseModel
 from ChessGame import ChessGame
 import chess
+import random
 
 router = APIRouter()
 
@@ -18,6 +19,9 @@ class GameStartRequest(BaseModel):
 # Create a global game instance
 game = ChessGame()
 
+# Store active games with their positions
+active_games = {}
+
 @router.get("/")
 async def chess_root() -> Dict[str, str]:
     """Chess endpoint."""
@@ -29,11 +33,22 @@ async def get_game() -> Dict[str, str]:
     return {"message": "Welcome to Chess 360!"}
 
 @router.post("/game/start")
-async def start_game(game_request: GameStartRequest) -> Dict[str, Any]:
+@router.get("/game/start")  # Allow both POST and GET
+async def start_game(game_request: GameStartRequest = None) -> Dict[str, Any]:
     """Start a new chess game with specified variant"""
-    global game
-    game = ChessGame(variant=game_request.variant)
-    return game.reset_game()
+    variant = "chess960" if game_request and game_request.variant == "chess960" else "standard"
+    
+    if variant == "chess960":
+        position_number = random.randint(0, 959)
+        board = chess.Board.from_chess960_pos(position_number)
+    else:
+        board = chess.Board()
+    
+    return {
+        "fen": board.fen(),
+        "variant": variant,
+        "status": "ok"
+    }
 
 @router.post("/game/move")
 async def make_move(move_request: MoveRequest) -> Dict[str, Any]:

@@ -170,6 +170,7 @@ async function handleRegisterSubmit() {
   width: 343px;
   height: 343px;
   top: 25%;
+  top: 25%;
   filter: blur(2px);
   z-index: 1;
 }
@@ -205,6 +206,7 @@ async function handleRegisterSubmit() {
 
 .login-container {
   position: absolute;
+  top: 30%;
   top: 30%;
   left: 50%;
   transform: translateX(-50%);

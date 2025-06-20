@@ -9,29 +9,22 @@
       </div>
     </div>
     <div class="window-content">
-      <div class="chess-board">
-        <div v-for="row in 8" :key="row" class="board-row">
-          <div 
-            v-for="col in 8" 
-            :key="col" 
-            :class="[
-              'board-cell', 
-              getCellColor(row, col),
-              { 'legal-move': isLegalMove(row-1, col-1) }
-            ]"
-            @dragover.prevent
-            @drop="handleDrop($event, row-1, col-1)"
-          >
-            <img 
-              v-if="board[row-1] && board[row-1][col-1]"
-              :src="getPieceImage(board[row-1][col-1])"
-              :alt="board[row-1][col-1]"
-              class="chess-piece"
-              draggable="true"
-              @dragstart="handleDragStart($event, row-1, col-1)"
-              @click="handlePieceClick(row-1, col-1)"
-            >
-            <div v-if="isLegalMove(row-1, col-1)" class="move-indicator"></div>
+      <div class="chess-board" :class="{ 'black-perspective': isBlackPlayer }">
+        <div v-for="(row, rowIndex) in board" :key="rowIndex" class="board-row">
+          <div v-for="(piece, colIndex) in row" 
+               :key="colIndex" 
+               class="board-cell"
+               :class="[getCellColor(rowIndex, colIndex), { 'legal-move': isLegalMove(rowIndex, colIndex) }]"
+               @dragenter.prevent
+               @dragover.prevent
+               @drop="handleDrop($event, rowIndex, colIndex)">
+            <div v-if="isLegalMove(rowIndex, colIndex)" class="move-indicator"></div>
+            <img v-if="piece"
+                 :src="getPieceImage(piece)"
+                 class="chess-piece"
+                 :draggable="true"
+                 @dragstart="handleDragStart($event, rowIndex, colIndex)"
+                 @click="handlePieceClick(rowIndex, colIndex)" />
           </div>
         </div>
       </div>
@@ -40,23 +33,31 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, defineExpose, defineProps, onMounted, onUnmounted, watch } from 'vue';
+import { io } from 'socket.io-client';
+
+const props = defineProps({
+  playerColor: {
+    type: String,
+    default: 'white',
+    validator: (value) => ['white', 'black'].includes(value)
+  },
+  gameId: {
+    type: String,
+    default: ''
+  }
+});
+
+// Create computed value for color checks using props
+const isBlackPlayer = computed(() => props.playerColor === 'black');
 
 // Initialize board with starting position
-const initialPosition = [
-  ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
-  ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
-  Array(8).fill(''),
-  Array(8).fill(''),
-  Array(8).fill(''),
-  Array(8).fill(''),
-  ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-  ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
-];
-
-const board = ref(initialPosition);
+const isMyTurn = ref(props.playerColor === 'white');
+const board = ref([]);
 const draggedPiece = ref(null);
 const legalMoves = ref([]);
+const socket = ref(null);
+const socketReady = ref(false);  // Add this flag
 
 const getPieceImage = (piece) => {
   if (!piece) return '';
@@ -77,33 +78,22 @@ const getCellColor = (row, col) => {
   return (row + col) % 2 === 0 ? 'white-cell' : 'black-cell';
 };
 
-const getLegalMoves = async (row, col) => {
-  const files = 'abcdefgh';
+const getRanks = (isBlack = false) => {
   const ranks = '87654321';
-  const square = files[col] + ranks[row];
-  
-  try {
-    const response = await fetch('http://localhost:8000/chess/game/legal-moves', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ square })
-    });
-    const data = await response.json();
-    return data.legal_moves;
-  } catch (error) {
-    console.error('Failed to get legal moves:', error);
-    return [];
-  }
+  return isBlack ? ranks.split('').reverse().join('') : ranks;
 };
 
 const isLegalMove = (row, col) => {
+  if (!draggedPiece.value || !isMyTurn.value || !legalMoves.value) return false;
+  
   const files = 'abcdefgh';
-  const ranks = '87654321';
+  const ranks = getRanks(props.playerColor === 'black');
   const targetSquare = files[col] + ranks[row];
   
-  return legalMoves.value.some(move => move.slice(2) === targetSquare);
+  return legalMoves.value.some(move => {
+    const moveTarget = move.slice(2, 4);
+    return moveTarget === targetSquare;
+  });
 };
 
 const isCastlingMove = (moveUCI) => {
@@ -116,137 +106,262 @@ const isCastlingMove = (moveUCI) => {
   return castlingMoves[moveUCI];
 };
 
+const handleDrop = async (event, targetRow, targetCol) => {
+  event.preventDefault();
+  
+  if (!draggedPiece.value || !isMyTurn.value) {
+    console.log('Not your turn or no piece selected');
+    return;
+  }
+  
+  if (!isLegalMove(targetRow, targetCol)) {
+    console.log('Illegal move attempted');
+    draggedPiece.value = null;
+    legalMoves.value = [];
+    return;
+  }
+  
+  const { row: fromRow, col: fromCol } = draggedPiece.value;
+  const files = 'abcdefgh';
+  const ranks = getRanks(props.playerColor === 'black');
+  const moveUCI = files[fromCol] + ranks[fromRow] + files[targetCol] + ranks[targetRow];
+  
+  console.log('Attempting move:', moveUCI);
+
+  // Check if this is a castling move
+  const castling = isCastlingMove(moveUCI);
+  if (castling) {
+    const [rookFromRow, rookFromCol] = getRookPosition(castling.from);
+    const [rookToRow, rookToCol] = getRookPosition(castling.to);
+    handleCastling(rookFromRow, rookFromCol, rookToRow, rookToCol, draggedPiece.value.piece);
+  }
+
+  // Make optimistic update
+  const newBoard = JSON.parse(JSON.stringify(board.value));
+  newBoard[targetRow][targetCol] = draggedPiece.value.piece;
+  newBoard[fromRow][fromCol] = '';
+  board.value = newBoard;
+
+  socket.value.emit('make_move', { move: moveUCI }, (response) => {
+    console.log('Move response:', response);
+    if (response?.error) {
+      console.error('Move error:', response.error);
+      // Move failed, revert the piece
+      const revertBoard = JSON.parse(JSON.stringify(board.value));
+      revertBoard[fromRow][fromCol] = draggedPiece.value.piece;
+      revertBoard[targetRow][targetCol] = '';
+      board.value = revertBoard;
+    }
+    draggedPiece.value = null;
+    legalMoves.value = [];
+  });
+};
+
+// Update socket event handlers in onMounted
+onMounted(async () => {
+  // Initialize Socket.IO connection first
+  socket.value = io('http://localhost:8000', {
+    transports: ['websocket', 'polling'],
+    withCredentials: true
+  });
+  
+  socket.value.on('connect', () => {
+    console.log('Connected to game server, socket id:', socket.value.id);
+    socketReady.value = true;
+    
+    if (props.gameId) {
+      socket.value.emit('join_game', {
+        gameId: props.gameId,
+        color: props.playerColor
+      });
+    }
+  });
+  
+  // Update the game_joined handler in onMounted
+  socket.value.on('game_joined', (data) => {
+    console.log('Joined game:', data);
+    // Set initial turn based on color and game state
+    isMyTurn.value = (props.playerColor === 'white' && data.is_white_turn) || 
+                     (props.playerColor === 'black' && !data.is_white_turn);
+    console.log(`Turn initialized: ${isMyTurn.value}, color: ${props.playerColor}, is_white_turn: ${data.is_white_turn}`);
+    updateBoardFromFen(data.fen);
+  });
+  
+  // Update the move_made handler
+  socket.value.on('move_made', (data) => {
+    console.log('Move made event received:', data);
+    if (data.fen) {
+      // Parse the FEN string into board position
+      const position = data.fen.split(' ')[0].split('/').map(row => 
+        row.split('').reduce((acc, char) => {
+          if (isNaN(char)) {
+            acc.push(char);
+          } else {
+            acc.push(...Array(parseInt(char)).fill(''));
+          }
+          return acc;
+        }, [])
+      );
+      
+      // Force reactive update with new array
+      board.value = props.playerColor === 'black' ? [...position].reverse() : [...position];
+      
+      // Update turn
+      isMyTurn.value = (props.playerColor === 'white' && data.is_white_turn) || 
+                       (props.playerColor === 'black' && !data.is_white_turn);
+      
+      console.log('Board updated from move:', {
+        fen: data.fen,
+        newBoard: board.value,
+        isMyTurn: isMyTurn.value,
+        playerColor: props.playerColor
+      });
+    }
+  });
+
+  socket.value.on('legal_moves', (data) => {
+    console.log('Received legal moves:', data);
+    if (data && Array.isArray(data.legal_moves)) {
+      legalMoves.value = data.legal_moves;
+    } else {
+      console.error('Invalid legal moves response:', data);
+      legalMoves.value = [];
+    }
+  });
+});
+
+const handlePieceClick = async (row, col) => {
+  const piece = board.value[row][col];
+  if (!piece) return;
+  
+  const isWhitePiece = piece === piece.toUpperCase();
+  if ((props.playerColor === 'white' && !isWhitePiece) || 
+      (props.playerColor === 'black' && isWhitePiece) ||
+      !isMyTurn.value) {
+    console.log('Not your turn or piece');
+    return;
+  }
+  
+  draggedPiece.value = { row, col, piece };
+  const files = 'abcdefgh';
+  const ranks = getRanks(props.playerColor === 'black');
+  const square = files[col] + ranks[row];
+  
+  console.log('Getting legal moves for:', piece, 'at', square);
+  socket.value.emit('get_legal_moves', { square });
+};
+
+const handleDragStart = async (event, row, col) => {
+  const piece = board.value[row][col];
+  const isWhitePiece = piece === piece.toUpperCase();
+  
+  if ((props.playerColor === 'white' && !isWhitePiece) || 
+      (props.playerColor === 'black' && isWhitePiece) ||
+      !isMyTurn.value) {
+    event.preventDefault();
+    return;
+  }
+  
+  draggedPiece.value = { row, col, piece };
+  event.dataTransfer.setData('text/plain', '');
+  
+  const files = 'abcdefgh';
+  const ranks = getRanks(props.playerColor === 'black');
+  const square = files[col] + ranks[row];
+  
+  console.log('Getting legal moves for:', piece, 'at', square);
+  socket.value.emit('get_legal_moves', { square });
+};
+
+// Remove getLegalMovesAsync function since we're not using callbacks anymore
+const handleCastling = (fromRow, fromCol, toRow, toCol, piece) => {
+  const rankIndex = piece === 'K' ? 7 : 0;
+  let rookCol;
+  
+  // Kingside castling (king moving towards h-file)
+  if (toCol > fromCol) {
+    // Find the rightmost rook
+    for (let col = 7; col > fromCol; col--) {
+      if (board.value[rankIndex][col]?.toLowerCase() === 'r') {
+        rookCol = col;
+        break;
+      }
+    }
+    if (rookCol !== undefined) {
+      // Always place rook on f-file (next to king's final position)
+      updateBoardPosition(rankIndex, rookCol, rankIndex, toCol - 1, piece === 'K' ? 'R' : 'r');
+    }
+  } 
+  // Queenside castling (king moving towards a-file)
+  else {
+    // Find the leftmost rook
+    for (let col = 0; col < fromCol; col++) {
+      if (board.value[rankIndex][col]?.toLowerCase() === 'r') {
+        rookCol = col;
+        break;
+      }
+    }
+    if (rookCol !== undefined) {
+      // Always place rook on d-file (next to king's final position)
+      updateBoardPosition(rankIndex, rookCol, rankIndex, toCol + 1, piece === 'K' ? 'R' : 'r');
+    }
+  }
+};
+
+const getRookPosition = (square) => {
+  const files = 'abcdefgh';
+  const ranks = '87654321';
+  const col = files.indexOf(square[0]);
+  const row = ranks.indexOf(square[1]);
+  return [row, col];
+};
+
 const updateBoardPosition = (fromRow, fromCol, toRow, toCol, piece) => {
   board.value[fromRow][fromCol] = '';
   board.value[toRow][toCol] = piece;
 };
 
-const handlePieceClick = async (row, col) => {
-  // Clear previous legal moves if clicking the same piece
-  if (draggedPiece.value?.row === row && draggedPiece.value?.col === col) {
-    draggedPiece.value = null;
-    legalMoves.value = [];
+const updateBoardFromFen = (fen) => {
+  if (!fen) {
+    console.warn('No FEN provided to updateBoardFromFen');
     return;
   }
   
-  // Set new dragged piece and get legal moves
-  draggedPiece.value = {
-    row,
-    col,
-    piece: board.value[row][col]
-  };
-  legalMoves.value = await getLegalMoves(row, col);
-};
-
-const handleDragStart = async (event, row, col) => {
-  draggedPiece.value = {
-    row,
-    col,
-    piece: board.value[row][col]
-  };
-  event.dataTransfer.setData('text/plain', board.value[row][col]);
-  
-  // Get and show legal moves
-  legalMoves.value = await getLegalMoves(row, col);
-};
-
-const handleDrop = async (event, targetRow, targetCol) => {
-  event.preventDefault();
-  
-  if (!draggedPiece.value) return;
-  
-  const { row: fromRow, col: fromCol } = draggedPiece.value;
-  
-  // Convert target position to UCI format
-  const files = 'abcdefgh';
-  const ranks = '87654321';
-  const moveUCI = files[fromCol] + ranks[fromRow] + files[targetCol] + ranks[targetRow];
-  
-  // Check if move is legal using the global legalMoves ref
-  if (!legalMoves.value.includes(moveUCI)) {
-    console.log('Illegal move');
-    draggedPiece.value = null;
-    return;
-  }
-  
-  try {
-    const response = await fetch('http://localhost:8000/chess/game/move', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ move: moveUCI })
-    });
-    
-    const data = await response.json();
-    if (!data.error) {
-      // Update king position
-      updateBoardPosition(fromRow, fromCol, targetRow, targetCol, draggedPiece.value.piece);
-      
-      // Check if this is a castling move and update rook position
-      const castling = isCastlingMove(moveUCI);
-      if (castling) {
-        const rookFrom = {
-          row: parseInt(ranks.indexOf(castling.from[1])),
-          col: files.indexOf(castling.from[0])
-        };
-        const rookTo = {
-          row: parseInt(ranks.indexOf(castling.to[1])),
-          col: files.indexOf(castling.to[0])
-        };
-        const rookPiece = board.value[rookFrom.row][rookFrom.col];
-        updateBoardPosition(rookFrom.row, rookFrom.col, rookTo.row, rookTo.col, rookPiece);
+  console.log('Updating board with FEN:', fen);
+  const position = fen.split(' ')[0].split('/').map(row => 
+    row.split('').reduce((acc, char) => {
+      if (isNaN(char)) {
+        acc.push(char);
+      } else {
+        acc.push(...Array(parseInt(char)).fill(''));
       }
-    }
-  } catch (error) {
-    console.error('Failed to make move:', error);
-  }
+      return acc;
+    }, [])
+  );
   
-  // Clear legal moves after drop
-  legalMoves.value = [];
-  draggedPiece.value = null;
+  // Force Vue to react to the board change
+  board.value = props.playerColor === 'black' ? [...position].reverse() : [...position];
+  console.log('Board updated:', board.value);
 };
 
-// initialization function
-const initializeGame = async (variant = "chess960") => {
-  try {
-    const response = await fetch('http://localhost:8000/chess/game/start', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ variant })
-    });
-    const data = await response.json();
-    console.log('Game initialized:', data);
-    
-    // Convert FEN to board array
-    const fenParts = data.fen.split(' ');
-    const position = fenParts[0].split('/').map(row => 
-      row.split('').reduce((acc, char) => {
-        if (isNaN(char)) {
-          acc.push(char);
-        } else {
-          acc.push(...Array(parseInt(char)).fill(''));
-        }
-        return acc;
-      }, [])
-    );
-    
-    // Update board with FEN position
-    board.value = position;
-    
-    // Clear any existing state
-    draggedPiece.value = null;
-    legalMoves.value = [];
-  } catch (error) {
-    console.error('Failed to initialize game:', error);
+onUnmounted(() => {
+  if (socket.value) {
+    socket.value.disconnect();
   }
-};
+});
 
-// Call initialization on component mount
-onMounted(() => {
-  initializeGame();
+// Create a watch effect for gameId
+watch(() => props.gameId, (newGameId) => {
+  if (newGameId && socketReady.value && socket.value) {
+    socket.value.emit('join_game', {
+      gameId: newGameId,
+      color: props.playerColor
+    });
+  }
+});
+
+defineExpose({
+  updateBoardFromFen
 });
 </script>
 
@@ -362,9 +477,12 @@ onMounted(() => {
   object-fit: contain;
   user-select: none;
   cursor: grab;
+  -webkit-user-drag: element;
+  transition: transform 0.1s ease-in-out;
 }
 
 .chess-piece:active {
   cursor: grabbing;
+  transform: scale(1.1);
 }
 </style>
